@@ -2,7 +2,7 @@
  * Pure binding logic (no Foundry globals), so it can be unit tested in Node.
  *
  * A binding says which transition plays and how:
- *   { transition, duration, title, titleText, sound }
+ *   { transition, duration, title, titleText, titleWhen, sound }
  * transition: ""      = inherit (use the next fallback)
  *             "none"  = no transition
  *             <id>    = one of the registered transitions
@@ -15,6 +15,8 @@ export const MIN_DURATION = 200;
 export const MAX_DURATION = 10000;
 export const MAX_TITLE = 120;
 export const MAX_SOUND = 500;
+/** When the title card shows: over the old scene, halfway through, or over the new scene. */
+export const TITLE_WHEN = ["before", "during", "after"];
 
 /** A clean binding from any stored or received value. Unknown transition ids become "inherit". */
 export function sanitizeBinding(raw, knownIds) {
@@ -28,7 +30,8 @@ export function sanitizeBinding(raw, knownIds) {
   let sound = typeof src.sound === "string" ? src.sound.trim().slice(0, MAX_SOUND) : "";
   // Only plain relative or http(s) paths; no javascript:, data: or other schemes.
   if (sound && /^[a-z][a-z0-9+.-]*:/i.test(sound) && !/^https?:\/\//i.test(sound)) sound = "";
-  return { transition, duration, title: src.title === true, titleText, sound };
+  const titleWhen = TITLE_WHEN.includes(src.titleWhen) ? src.titleWhen : "during";
+  return { transition, duration, title: src.title === true, titleText, titleWhen, sound };
 }
 
 /** True when the binding decides something (not "inherit"). */

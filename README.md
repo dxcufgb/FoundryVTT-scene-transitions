@@ -40,8 +40,10 @@ https://github.com/dxcufgb/FoundryVTT-scene-transitions/releases/latest/download
 | Tiles | The new scene appears tile by tile. |
 | Dissolve | The new scene seeps in through drifting blobs. |
 | Stairs down / Stairs up | The old scene moves up (or down) into darkness and the new one rises from the other side. |
+| Stairs down: pass through | The old scene rushes towards you until it passes your point of view, revealing the new scene below. |
+| Stairs up: from behind | The new scene comes from behind you, over your head, and settles into view as the old one sinks away. |
 
-Each binding also has a **duration**, an optional **title card** (the scene's name, or your own text) and an optional **sound**. The sidebar and other UI stay usable during a transition.
+Each binding also has a **duration**, an optional **title card** (the scene's name, or your own text) and an optional **sound**. The title card shows **before** (from the start, over the scene you leave), **during** (around the middle) or **after** the transition (over the new scene once it's live). Before and during never pause the transition: the text fades in and out while it plays. The sidebar and other UI stay usable during a transition.
 
 ### Which transition plays
 
@@ -69,7 +71,7 @@ Activating a scene, from the Scenes directory or the navigation bar, opens a sma
 
 ### Stairways
 
-With [Stairways](https://foundryvtt.com/packages/stairways) enabled, every stairway config gets a **Transition** tab, and each end of a stairway can have its own: stairs down one way, stairs up the other. Only the user who takes the stairway sees it, because only their view changes. Stairways within one scene play their transition too, and the view pans to where you arrive. A stairway left on *inherit* uses the scene bindings (or, within a scene, the same-scene default).
+With [Stairways](https://foundryvtt.com/packages/stairways) enabled, each end of a stairway can have its own transition: stairs down one way, stairs up the other. The GM sees a small **film badge** on the corner of every stairway icon. It's lit orange when that end has its own transition, and hovering shows which one. Click the badge (it doesn't teleport) to open a small editor for that end, with a preview and an **Edit** button for the other end, wherever it is. The stairway config also has a **Transition** tab. Only the user who takes the stairway sees it, because only their view changes. It starts the moment they click, so the tokens leaving the scene are already covered. Stairways within one scene play their transition too, and the view pans to where you arrive. A stairway left on *inherit* uses the scene bindings (or, within a scene, the same-scene default).
 
 ### Who sees what
 
@@ -102,7 +104,7 @@ With [Stairways](https://foundryvtt.com/packages/stairways) enabled, every stair
 | `sanitize(binding)` | Returns a clean binding. |
 | `openManager(sceneId?)` | GM: opens the Transitions manager. |
 
-A **binding** is `{transition, duration, title, titleText, sound}`: `transition` is a transition id, `"none"`, or `""` (inherit). `duration` is in milliseconds (200–10000).
+A **binding** is `{transition, duration, title, titleText, titleWhen, sound}`: `transition` is a transition id, `"none"`, or `""` (inherit). `duration` is in milliseconds (200–10000). `titleWhen` is `"before"`, `"during"` (default) or `"after"`.
 
 **Hooks**
 

@@ -49,6 +49,11 @@ function rng(seed) {
   };
 }
 
+function smooth(edge0, edge1, x) {
+  const k = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return k * k * (3 - 2 * k);
+}
+
 function throughColor(color) {
   return (ctx, f) => {
     const { phase, p, A, B, w, h } = f;
@@ -284,6 +289,37 @@ export const BUILTIN_TRANSITIONS = [
       if (phase === "out") draw(ctx, A, w, h, { y: p * h * 0.35, alpha: 1 - p * 0.9 });
       else draw(ctx, B, w, h, { y: -(1 - p) * h * 0.35, alpha: 0.1 + p * 0.9 });
       fill(ctx, "#000", phase === "out" ? p : 1 - p, w, h);
+    }
+  },
+  {
+    // Going down: the current scene rushes towards the viewer until it passes them, revealing the new one below
+    id: "stairsDownPass", label: "DXST.Transition.stairsDownPass", icon: "fa-solid fa-person-falling", split: false,
+    draw(ctx, { p, A, B, w, h }) {
+      fill(ctx, "#000", 1, w, h);
+      draw(ctx, B, w, h, { scale: 0.82 + 0.18 * p });
+      fill(ctx, "#000", (1 - p) * 0.65, w, h);
+      const pass = smooth(0.5, 1, p);
+      if (pass >= 1) return;
+      ctx.save();
+      const blur = Math.max(w, h) * 0.012 * p * p;
+      if (blur > 0.5) ctx.filter = `blur(${blur.toFixed(1)}px)`;
+      draw(ctx, A, w, h, { scale: 1 + 4 * p * p, alpha: 1 - pass });
+      ctx.restore();
+    }
+  },
+  {
+    // Going up: the new scene comes from behind the viewer, over their head, and settles into view
+    id: "stairsUpBehind", label: "DXST.Transition.stairsUpBehind", icon: "fa-solid fa-person-arrow-up-from-line", split: false,
+    draw(ctx, { p, A, B, w, h }) {
+      fill(ctx, "#000", 1, w, h);
+      draw(ctx, A, w, h, { scale: 1 - 0.18 * p });
+      fill(ctx, "#000", p * 0.65, w, h);
+      const k = 1 - p;
+      ctx.save();
+      const blur = Math.max(w, h) * 0.012 * k * k;
+      if (blur > 0.5) ctx.filter = `blur(${blur.toFixed(1)}px)`;
+      draw(ctx, B, w, h, { scale: 1 + 4 * k * k, alpha: smooth(0, 0.5, p) });
+      ctx.restore();
     }
   }
 ];

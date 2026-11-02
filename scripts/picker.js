@@ -1,6 +1,6 @@
 import { MODULE_ID, t, escapeHTML, sceneName } from "./util.js";
 import { TRANSITIONS, knownIds } from "./transitions.js";
-import { sanitizeBinding, phaseDurations, ease, INHERIT, NONE } from "./bindings.js";
+import { sanitizeBinding, phaseDurations, ease, INHERIT, NONE, TITLE_WHEN } from "./bindings.js";
 import { previewOnScreen } from "./player.js";
 
 /**
@@ -46,8 +46,13 @@ export function pickerHTML(raw, { key = "", inherit = null } = {}) {
     <button type="button" class="dxst-icon${b.title || b.sound ? " dxst-active" : ""}" data-dxst-action="more" data-tooltip="${escapeHTML(t("MoreOptions"))}"><i class="fa-solid fa-sliders"></i></button>
   </div>
   <div class="dxst-picker-more" hidden>
-    <label class="dxst-check"><input type="checkbox" data-dxst-field="title"${b.title ? " checked" : ""}> ${escapeHTML(t("Field.Title"))}</label>
-    <input type="text" data-dxst-field="titleText" maxlength="120" value="${escapeHTML(b.titleText)}" placeholder="${escapeHTML(t("Field.TitlePlaceholder"))}">
+    <div class="dxst-title-row">
+      <label class="dxst-check"><input type="checkbox" data-dxst-field="title"${b.title ? " checked" : ""}> ${escapeHTML(t("Field.Title"))}</label>
+      <select data-dxst-field="titleWhen" aria-label="${escapeHTML(t("Field.TitleWhen"))}" data-tooltip="${escapeHTML(t("Field.TitleWhen"))}">
+        ${TITLE_WHEN.map(w => `<option value="${w}"${b.titleWhen === w ? " selected" : ""}>${escapeHTML(t(`TitleWhen.${w}`))}</option>`).join("")}
+      </select>
+    </div>
+    <input type="text" class="dxst-title-text" data-dxst-field="titleText" maxlength="120" value="${escapeHTML(b.titleText)}" placeholder="${escapeHTML(t("Field.TitlePlaceholder"))}">
     <div class="dxst-sound">
       <span>${escapeHTML(t("Field.Sound"))}</span>
       <file-picker type="audio" data-dxst-field="sound" value="${escapeHTML(b.sound)}"></file-picker>
@@ -65,6 +70,7 @@ export function readPicker(root) {
     duration: Number(q("duration")?.value) * 1000,
     title: !!q("title")?.checked,
     titleText: q("titleText")?.value ?? "",
+    titleWhen: q("titleWhen")?.value ?? "during",
     sound: soundEl?.value ?? soundEl?.querySelector?.("input")?.value ?? ""
   }, knownIds());
 }
