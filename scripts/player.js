@@ -8,10 +8,12 @@ import { resolveBinding, phaseDurations, ease, NONE } from "./bindings.js";
  * scene once it is ready and plays the "in" phase from the overlay, then removes the overlay.
  */
 
-const TITLE_HOLD = 1400;       // ms the title card stays before the "in" phase
+const TITLE_HOLD = 1600;       // ms the title card stays
+const TITLE_FADE = 600;        // ms the title card takes to fade (styles: .dxst-title transition)
 const SCENE_TIMEOUT = 30000;   // ms to wait for the new scene before giving up
 const LOCAL_TIMEOUT = 3000;    // ms to wait for a same-scene teleport
 const PENDING_TTL = 20000;     // ms an explicit choice waits for its scene change
+const CLAIM_TIMEOUT = 5000;    // ms a run started ahead of a scene change (stairways) waits for that change
 
 /** An explicit choice for the next change to a scene: {sceneId, binding|null, snapshot|null, ts}. */
 let pending = null;
@@ -88,8 +90,9 @@ function playSound(src) {
 }
 
 class Run {
-  constructor(def, binding, A, { kind, title, context }) {
+  constructor(def, binding, A, { kind, title, context, claimFor = null }) {
     this.def = def;
+    this.claimFor = claimFor;
     this.binding = binding;
     this.kind = kind;
     this.context = context;
@@ -122,18 +125,19 @@ class Run {
     playSound(this.binding.sound);
     Hooks.callAll("dxcufgbsSceneTransitionStart", this.context);
 
-    this.outDone = (async () => {
-      if (this.def.split) {
-        await animate(this.durations.out, raw => this.frame("out", raw), () => this.cancelled);
-      }
-      if (this.title && !this.cancelled) {
-        el.classList.add("dxst-title-on");
-        this.titleShownAt = performance.now();
-      }
-    })();
+    // When the title card shows: "before" (from the start, over the old scene), "during" (around the middle) or
+    // "after" (over the new scene once it is live). Before and during never hold the transition up.
+    this.titleWhen = this.title ? (this.binding.titleWhen ?? "during") : null;
+    if (this.titleWhen === "before") this.scheduleTitle(0);
+    else if (this.titleWhen === "during" && this.def.split) this.scheduleTitle(this.durations.out * 0.6);
+    this.outDone = this.def.split
+      ? animate(this.durations.out, raw => this.frame("out", raw), () => this.cancelled)
+      : Promise.resolve();
 
     const timeout = this.kind === "local" ? LOCAL_TIMEOUT : SCENE_TIMEOUT;
     this.timer = setTimeout(() => this.arrive(), timeout);
+    // Started ahead of a scene change (a stairway): if the change doesn't come, play back into the current view
+    if (this.claimFor) this.claimTimer = setTimeout(() => this.arrive(), CLAIM_TIMEOUT);
     if (this.kind === "preview") this.arrive();
   }
 
@@ -145,11 +149,19 @@ class Run {
     ctx.restore();
   }
 
+  /** The scene change this run was started for has begun: keep waiting for canvasReady. */
+  claim() {
+    clearTimeout(this.claimTimer);
+    this.claimFor = null;
+    this.claimed = true;
+  }
+
   /** The new view is ready (or we stop waiting): snapshot it and play the "in" phase. */
   arrive(prepare) {
     if (this.arrived || this.cancelled) return;
     this.arrived = true;
     clearTimeout(this.timer);
+    clearTimeout(this.claimTimer);
     this.finish(prepare).catch(err => {
       console.error(`${MODULE_ID} | transition failed`, err);
       this.remove();
@@ -165,19 +177,34 @@ class Run {
     await nextFrame();
     if (this.cancelled) return;
     this.B = (this.kind === "preview" ? this.A : snapshotCanvas()) ?? blank(this.w, this.h);
-    if (this.title && this.titleShownAt) {
-      const left = TITLE_HOLD - (performance.now() - this.titleShownAt);
-      if (left > 0) await sleep(left);
-    }
-    if (this.cancelled) return;
-    this.el.classList.remove("dxst-title-on");
+    if (this.titleWhen === "during" && !this.def.split) this.scheduleTitle(this.durations.in * 0.3);
     await animate(this.durations.in, raw => this.frame("in", raw), () => this.cancelled);
+    if (this.cancelled) return;
+    if (this.titleWhen === "after") this.scheduleTitle(0);
+    // A title card still on screen stays over the live scene until it has faded
+    const left = this.titleWhen === "after" ? TITLE_HOLD : (this.titleUntil ?? 0) - performance.now();
+    if (left > -TITLE_FADE) {
+      this.cv.remove();
+      await sleep(left + TITLE_FADE);
+    }
     this.remove();
+  }
+
+  /** Shows the title card after delay ms, for TITLE_HOLD ms, without holding the transition up. */
+  scheduleTitle(delay) {
+    if (!this.title) return;
+    this.titleUntil = performance.now() + delay + TITLE_HOLD;
+    this.titleTimers = [
+      setTimeout(() => { if (!this.cancelled) this.el?.classList.add("dxst-title-on"); }, delay),
+      setTimeout(() => this.el?.classList.remove("dxst-title-on"), delay + TITLE_HOLD)
+    ];
   }
 
   cancel() {
     this.cancelled = true;
+    for (const timer of this.titleTimers ?? []) clearTimeout(timer);
     clearTimeout(this.timer);
+    clearTimeout(this.claimTimer);
     this.remove();
   }
 
@@ -192,9 +219,11 @@ class Run {
 
 /**
  * Starts a transition now. kind: "scene" (waits for canvasReady), "local" (the caller calls run.arrive()) or "preview".
+ * claimFor: a scene id when the run starts ahead of the change to that scene (a stairway); the canvas wrapper then
+ * keeps this run instead of starting a new one.
  * Returns the run, or null when nothing plays.
  */
-export function startRun(binding, { A = null, kind = "scene", title = "", context = {} } = {}) {
+export function startRun(binding, { A = null, kind = "scene", title = "", context = {}, claimFor = null } = {}) {
   if (!binding || binding.transition === NONE) return null;
   // A hidden tab gets no animation frames, so the overlay would hang there until the user comes back
   if (document.hidden) return null;
@@ -205,7 +234,7 @@ export function startRun(binding, { A = null, kind = "scene", title = "", contex
   const finalDef = TRANSITIONS.get(ctx.binding?.transition) ?? def;
   if (ctx.binding?.transition === NONE) return null;
   current?.cancel();
-  const run = new Run(finalDef, ctx.binding ?? binding, A ?? snapshotCanvas(), { kind, title, context: ctx });
+  const run = new Run(finalDef, ctx.binding ?? binding, A ?? snapshotCanvas(), { kind, title, context: ctx, claimFor });
   current = run;
   run.start();
   return run;
@@ -236,6 +265,12 @@ function beforeDraw(cnv, scene) {
   const from = cnv.scene;
   const to = scene ?? game.scenes.current;
   if (!from || !to || from.id === to.id || !cnv.ready || cnv.loading) return;
+  // A run already started for this change (a stairway) carries on
+  if (current && !current.arrived && !current.cancelled && current.claimFor === to.id) {
+    current.claim();
+    takePending(to.id);
+    return;
+  }
   const p = takePending(to.id);
   if (!clientEnabled()) return;
   // A GM just looking at another scene gets no transition, unless they asked for it or chose one
@@ -265,7 +300,8 @@ export function patchCanvasDraw() {
 }
 
 export function onCanvasReady() {
-  if (current?.kind === "scene") current.arrive();
+  // A run still waiting for its scene change to begin (claimFor) belongs to a later draw
+  if (current?.kind === "scene" && !current.claimFor) current.arrive();
 }
 
 /** Plays a binding over the current view (A → A), for trying it out. */

@@ -25,16 +25,22 @@ System-agnostic. No build step and no npm dependencies. Stairways is optional.
   it), so there is no socket. Payload `{binding}`; `binding: null` means "each client uses its bound transition".
 - `scripts/picker.js` – the picker used everywhere (escaped HTML string + `wirePickers`), and the thumbnail preview
   (scene thumbs, or a placeholder).
-- `scripts/stairways.js` – Stairways: `PreStairwayTeleport` (never returns false) sets the pending choice and
-  snapshot for a cross-scene teleport, or starts a "local" run for a same-scene one that `StairwayTeleport` finishes
-  (pans to the target). The Transition tab in the Stairways config sheet (`renderStairwayConfig`, AppV1).
+- `scripts/stairways.js` – Stairways. `PreStairwayTeleport` (never returns false): for a cross-scene teleport it
+  starts a "scene" run right away, `claimFor` the target scene, so the overlay covers the tokens leaving and the
+  canvas wrapper keeps the run when the view changes (no change within 5 s → it plays back into the current view);
+  for a same-scene one it starts a "local" run that `StairwayTeleport` finishes (pans to the target).
+  GM film badges live in a container on `canvas.controls` (not in `canvas.controls.stairways`, whose children
+  Stairways iterates) and are redrawn on canvasReady / refreshStairway / flag changes. The Transition tab in the
+  Stairways config sheet (`renderStairwayConfig`, AppV1).
+- `scripts/apps/stair-editor.js` + `templates/stair-editor.hbs` – the small editor for one stairway end, opened from the
+  film badge (`stairwayPartner` finds the other end: same name on the target scene).
 - `scripts/apps/manager.js` + `templates/manager.hbs` – the Transitions manager (ApplicationV2): world defaults,
   a scene's "entering" binding, its "coming from" rows and its stairways.
 - `styles/scene-transitions.css`, `lang/en.json`.
 
 ## Data
-- A binding is `{transition, duration (ms), title, titleText, sound}`. `transition`: `""` inherit, `"none"`, or a
-  registered id. Always passed through `sanitizeBinding` when read or received.
+- A binding is `{transition, duration (ms), title, titleText, titleWhen, sound}` (`titleWhen`: before | during |
+  after; before and during never hold the transition up). `transition`: `""` inherit, `"none"`, or a registered id. Always passed through `sanitizeBinding` when read or received.
 - Scene flags (GM writes, one dot-path key per update):
   `flags.dxcufgbs-scene-transitions.enter`, `.from.<sourceSceneId>` (on the scene being entered),
   `.stairways.<stairwayId>` (on the stairway's own scene).

@@ -17,7 +17,8 @@
       "DurationHint": "Duration in seconds",
       "Title": "Show a title card",
       "TitlePlaceholder": "Scene name",
-      "Sound": "Sound"
+      "Sound": "Sound",
+      "TitleWhen": "When the title card shows"
     },
     "Transition": {
       "fade": "Fade through black",
@@ -33,7 +34,9 @@
       "tiles": "Tiles",
       "dissolve": "Dissolve",
       "stairsDown": "Stairs down",
-      "stairsUp": "Stairs up"
+      "stairsUp": "Stairs up",
+      "stairsDownPass": "Stairs down: pass through",
+      "stairsUpBehind": "Stairs up: from behind"
     },
     "Manager": {
       "Title": "Scene Transitions",
@@ -89,6 +92,24 @@
         "Name": "Transitions when I only view a scene (GM)",
         "Hint": "Play bound transitions when you, as GM, view a scene without activating it. Activating, stairways and previews always play."
       }
+    },
+    "Badge": {
+      "Inherit": "No transition of its own (uses the fallback)",
+      "None": "Transition: none",
+      "Bound": "Transition: {name} ({seconds} s)",
+      "Click": "click to edit"
+    },
+    "StairEditor": {
+      "Title": "Transition: {name}",
+      "Missing": "This stairway no longer exists.",
+      "OtherEnd": "Other end",
+      "EditOtherEnd": "Edit",
+      "AllTransitions": "All transitions"
+    },
+    "TitleWhen": {
+      "before": "Before (over this scene)",
+      "during": "During (halfway)",
+      "after": "After (over the new scene)"
     }
   }
 }

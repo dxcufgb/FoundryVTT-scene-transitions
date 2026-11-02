@@ -9,7 +9,7 @@ const known = new Set(["fade", "iris", "crossfade"]);
 
 test("sanitize: defaults and clamping", () => {
   assert.deepEqual(sanitizeBinding(null, known),
-    { transition: "", duration: DEFAULT_DURATION, title: false, titleText: "", sound: "" });
+    { transition: "", duration: DEFAULT_DURATION, title: false, titleText: "", titleWhen: "during", sound: "" });
   assert.equal(sanitizeBinding({ duration: 5 }, known).duration, MIN_DURATION);
   assert.equal(sanitizeBinding({ duration: 1e9 }, known).duration, MAX_DURATION);
   assert.equal(sanitizeBinding({ duration: "abc" }, known).duration, DEFAULT_DURATION);
@@ -17,6 +17,13 @@ test("sanitize: defaults and clamping", () => {
   assert.equal(sanitizeBinding({ title: true }, known).title, true);
   assert.equal(sanitizeBinding({ titleText: "  a \n b  " }, known).titleText, "a b");
   assert.equal(sanitizeBinding({ titleText: "x".repeat(500) }, known).titleText.length, 120);
+});
+
+test("sanitize: title timing", () => {
+  assert.equal(sanitizeBinding({ titleWhen: "before" }, known).titleWhen, "before");
+  assert.equal(sanitizeBinding({ titleWhen: "after" }, known).titleWhen, "after");
+  assert.equal(sanitizeBinding({ titleWhen: "sometime" }, known).titleWhen, "during");
+  assert.equal(sanitizeBinding({}, known).titleWhen, "during");
 });
 
 test("sanitize: unknown transitions inherit, none stays", () => {

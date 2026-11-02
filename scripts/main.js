@@ -15,7 +15,8 @@
  *   preview(binding)               → plays a binding over the current view on this client
  *   sanitize(binding)              → a clean binding
  *   openManager(sceneId?)          → GM: opens the Transitions manager
- * A binding is {transition, duration (ms), title (bool), titleText, sound}; transition "" = inherit, "none" = none.
+ * A binding is {transition, duration (ms), title (bool), titleText, titleWhen ("before" | "during" | "after"), sound};
+ * transition "" = inherit, "none" = none.
  *
  * Hooks:
  *   dxcufgbsPreSceneTransition(context)   → return false to cancel; context.binding can be changed

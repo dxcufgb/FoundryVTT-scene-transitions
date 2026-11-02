@@ -1,0 +1,24 @@
+<div class="dxst-stair-body">
+  {{#if missing}}
+  <p class="dxst-empty">{{localize "DXST.StairEditor.Missing"}}</p>
+  {{else}}
+  <div class="dxst-stair-route">
+    <i class="fa-solid fa-stairs"></i>
+    <span><strong>{{name}}</strong> <i class="fa-solid fa-arrow-right"></i> {{to}}</span>
+  </div>
+  <p class="hint">{{hint}}</p>
+  {{{picker}}}
+  {{#if partner}}
+  <div class="dxst-stair-partner">
+    <span>
+      {{localize "DXST.StairEditor.OtherEnd"}}: <strong>{{partner.name}}</strong> ({{partner.scene}})<br>
+      <span class="hint" data-dxst-partner-summary>{{partner.summary}}</span>
+    </span>
+    <button type="button" data-action="otherEnd"><i class="fa-solid fa-right-left"></i> {{localize "DXST.StairEditor.EditOtherEnd"}}</button>
+  </div>
+  {{/if}}
+  <footer class="dxst-stair-footer">
+    <button type="button" data-action="openManager"><i class="fa-solid fa-film"></i> {{localize "DXST.StairEditor.AllTransitions"}}</button>
+  </footer>
+  {{/if}}
+</div>

@@ -66,6 +66,9 @@
   border-left: 2px solid var(--color-border, rgba(127, 127, 127, 0.4));
 }
 .dxst-picker-more[hidden] { display: none; }
+.dxst-title-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dxst-title-row select { flex: 1; min-width: 0; }
+.dxst-title-text { grid-column: 1 / -1; width: 100%; }
 .dxst-picker-more .dxst-sound { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
 .dxst-picker-more .dxst-sound file-picker { flex: 1; }
 .dxst-check { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
@@ -104,3 +107,22 @@
 
 /* Stairways config tab */
 .dxst-stairway-tab .dxst-picker { margin-top: 6px; }
+
+/* Stairway transition editor */
+.dxst-stair-editor .window-content { padding: 8px 10px; }
+.dxst-stair-body { display: flex; flex-direction: column; gap: 6px; }
+.dxst-stair-route { display: flex; align-items: center; gap: 8px; font-size: var(--font-size-14, 14px); }
+.dxst-stair-body .hint { margin: 0; opacity: 0.75; font-size: var(--font-size-12, 12px); }
+.dxst-stair-partner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(127, 127, 127, 0.12);
+}
+.dxst-stair-partner button { flex: 0 0 auto; }
+.dxst-stair-footer { display: flex; justify-content: flex-end; }
+.dxst-stair-footer button { flex: 0 0 auto; }
+#dxst-badge-tip { position: fixed; width: 1px; height: 1px; pointer-events: none; }
