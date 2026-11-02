@@ -1,0 +1,306 @@
+/**
+ * The transitions. Each one draws a frame onto a 2D canvas context from two pictures:
+ *   A = the scene being left, B = the scene being entered (only in the "in" phase).
+ *
+ * A definition is { id, label, icon, split, draw(ctx, frame) }:
+ *   split: true  → two phases: "out" (A goes away, e.g. to black) while B loads, then "in" (B appears).
+ *   split: false → one "in" phase from A straight to B, once B is ready (A is held while B loads).
+ *   frame = { phase: "out" | "in", p: 0..1 (eased), raw: 0..1, A, B, w, h, state }
+ *     state is an object kept for the whole run (for random layouts and scratch canvases).
+ * Every size is relative to w / h, so the same code draws the full screen and the small previews.
+ * Other modules can add their own with api.register(id, definition).
+ */
+
+const TAU = Math.PI * 2;
+
+function fill(ctx, color, alpha, w, h) {
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, alpha);
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
+function draw(ctx, img, w, h, { x = 0, y = 0, scale = 1, alpha = 1 } = {}) {
+  if (!img) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const sw = w * scale, sh = h * scale;
+  ctx.drawImage(img, x + (w - sw) / 2, y + (h - sh) / 2, sw, sh);
+  ctx.restore();
+}
+
+function scratch(state, key, w, h) {
+  let c = state[key];
+  if (!c) {
+    c = state[key] = document.createElement("canvas");
+  }
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  return c;
+}
+
+/** Seeded pseudo-random numbers, so a preview and the real thing can share a layout. */
+function rng(seed) {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+    return ((s >>> 0) % 100000) / 100000;
+  };
+}
+
+function throughColor(color) {
+  return (ctx, f) => {
+    const { phase, p, A, B, w, h } = f;
+    if (phase === "out") { draw(ctx, A, w, h); fill(ctx, color, p, w, h); }
+    else { draw(ctx, B, w, h); fill(ctx, color, 1 - p, w, h); }
+  };
+}
+
+export const BUILTIN_TRANSITIONS = [
+  {
+    id: "fade", label: "DXST.Transition.fade", icon: "fa-solid fa-circle-half-stroke", split: true,
+    draw: throughColor("#000")
+  },
+  {
+    id: "flash", label: "DXST.Transition.flash", icon: "fa-solid fa-sun", split: true,
+    draw: throughColor("#fff")
+  },
+  {
+    id: "crossfade", label: "DXST.Transition.crossfade", icon: "fa-solid fa-clone", split: false,
+    draw(ctx, { p, A, B, w, h }) {
+      draw(ctx, A, w, h);
+      draw(ctx, B, w, h, { alpha: p });
+    }
+  },
+  {
+    id: "iris", label: "DXST.Transition.iris", icon: "fa-regular fa-circle-dot", split: true,
+    draw(ctx, { phase, p, A, B, w, h }) {
+      const R = Math.hypot(w, h) / 2;
+      const r = phase === "out" ? (1 - p) * R : p * R;
+      fill(ctx, "#000", 1, w, h);
+      if (r <= 0.5) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, r, 0, TAU);
+      ctx.clip();
+      draw(ctx, phase === "out" ? A : B, w, h);
+      ctx.restore();
+      // A soft dark rim on the edge of the circle
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, r, 0, TAU);
+      ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.03);
+      ctx.strokeStyle = "rgba(0,0,0,0.6)";
+      ctx.filter = `blur(${Math.max(1, Math.min(w, h) * 0.01)}px)`;
+      ctx.stroke();
+      ctx.restore();
+    }
+  },
+  {
+    id: "wipe", label: "DXST.Transition.wipe", icon: "fa-solid fa-arrow-right-long", split: false,
+    draw(ctx, { p, A, B, w, h, state }) {
+      const edge = w * 0.12;
+      const x = p * (w + edge);
+      draw(ctx, A, w, h);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, Math.max(0, x - edge), h);
+      ctx.clip();
+      draw(ctx, B, w, h);
+      ctx.restore();
+      // Feathered edge: B fades in over the last `edge` pixels
+      const c = scratch(state, "wipe", Math.ceil(edge) || 1, h);
+      const cx = c.getContext("2d");
+      cx.clearRect(0, 0, c.width, c.height);
+      cx.drawImage(B, Math.round(x - edge), 0, c.width, h, 0, 0, c.width, h);
+      cx.globalCompositeOperation = "destination-in";
+      const g = cx.createLinearGradient(0, 0, c.width, 0);
+      g.addColorStop(0, "rgba(0,0,0,1)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      cx.fillStyle = g;
+      cx.fillRect(0, 0, c.width, h);
+      cx.globalCompositeOperation = "source-over";
+      ctx.drawImage(c, Math.round(x - edge), 0);
+    }
+  },
+  {
+    id: "slide", label: "DXST.Transition.slide", icon: "fa-solid fa-right-left", split: false,
+    draw(ctx, { p, A, B, w, h }) {
+      fill(ctx, "#000", 1, w, h);
+      draw(ctx, A, w, h, { x: -p * w });
+      draw(ctx, B, w, h, { x: w - p * w });
+    }
+  },
+  {
+    id: "curtain", label: "DXST.Transition.curtain", icon: "fa-solid fa-person-booth", split: false,
+    draw(ctx, { p, A, B, w, h }) {
+      const half = w / 2;
+      const off = p * half;
+      draw(ctx, B, w, h);
+      fill(ctx, "#000", (1 - p) * 0.5, w, h);
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.7)";
+      ctx.shadowBlur = Math.min(w, h) * 0.05;
+      ctx.drawImage(A, 0, 0, half, h, -off, 0, half, h);
+      ctx.drawImage(A, half, 0, w - half, h, half + off, 0, w - half, h);
+      ctx.restore();
+    }
+  },
+  {
+    id: "blur", label: "DXST.Transition.blur", icon: "fa-solid fa-droplet", split: true,
+    draw(ctx, { phase, p, A, B, w, h }) {
+      const max = Math.max(w, h) * 0.02;
+      const k = phase === "out" ? p : 1 - p;
+      ctx.save();
+      ctx.filter = k > 0.01 ? `blur(${(k * max).toFixed(1)}px)` : "none";
+      // Draw a little oversized so the blurred edges never show the background
+      draw(ctx, phase === "out" ? A : B, w, h, { scale: 1 + k * 0.06 });
+      ctx.restore();
+      fill(ctx, "#000", k * 0.55, w, h);
+    }
+  },
+  {
+    id: "pixelate", label: "DXST.Transition.pixelate", icon: "fa-solid fa-chess-board", split: true,
+    draw(ctx, { phase, p, A, B, w, h, state }) {
+      const k = phase === "out" ? p : 1 - p;
+      const block = Math.max(1, Math.round(1 + k * Math.max(w, h) / 28));
+      const img = phase === "out" ? A : B;
+      if (block <= 1) { draw(ctx, img, w, h); return; }
+      const sw = Math.max(1, Math.round(w / block)), sh = Math.max(1, Math.round(h / block));
+      const c = scratch(state, "pix", sw, sh);
+      const cx = c.getContext("2d");
+      cx.imageSmoothingEnabled = true;
+      cx.drawImage(img, 0, 0, sw, sh);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(c, 0, 0, sw, sh, 0, 0, w, h);
+      ctx.restore();
+      fill(ctx, "#000", Math.max(0, k - 0.6) * 1.5, w, h);
+    }
+  },
+  {
+    id: "zoom", label: "DXST.Transition.zoom", icon: "fa-solid fa-magnifying-glass-plus", split: true,
+    draw(ctx, { phase, p, A, B, w, h }) {
+      fill(ctx, "#000", 1, w, h);
+      if (phase === "out") draw(ctx, A, w, h, { scale: 1 + p * 0.6, alpha: 1 - p });
+      else draw(ctx, B, w, h, { scale: 1.25 - p * 0.25, alpha: p });
+    }
+  },
+  {
+    id: "tiles", label: "DXST.Transition.tiles", icon: "fa-solid fa-table-cells", split: false,
+    draw(ctx, { p, A, B, w, h, state }) {
+      const cols = 14;
+      const size = w / cols;
+      const rows = Math.ceil(h / size);
+      if (!state.tiles || state.tiles.cols !== cols || state.tiles.rows !== rows) {
+        const rand = rng(1337);
+        const order = [];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const diag = (c / cols + r / rows) / 2;
+            order.push({ c, r, t: Math.min(0.85, diag * 0.6 + rand() * 0.4) });
+          }
+        }
+        state.tiles = { cols, rows, order };
+      }
+      draw(ctx, A, w, h);
+      for (const cell of state.tiles.order) {
+        const local = (p - cell.t) / 0.15;
+        if (local <= 0) continue;
+        const k = Math.min(1, local);
+        const x = cell.c * size, y = cell.r * size;
+        const s = size * (0.4 + 0.6 * k);
+        const sx = x + (size - s) / 2, sy = y + (size - s) / 2;
+        ctx.save();
+        ctx.globalAlpha = k;
+        ctx.beginPath();
+        ctx.rect(sx, sy, s + 0.5, s + 0.5);
+        ctx.clip();
+        ctx.drawImage(B, 0, 0, w, h);
+        ctx.restore();
+      }
+    }
+  },
+  {
+    id: "dissolve", label: "DXST.Transition.dissolve", icon: "fa-solid fa-wand-magic-sparkles", split: false,
+    draw(ctx, { p, A, B, w, h, state }) {
+      // Low-resolution noise, scaled up smoothly, gives soft drifting blobs
+      const nw = 96, nh = Math.max(8, Math.round(96 * h / w));
+      if (!state.noise || state.noise.length !== nw * nh) {
+        const rand = rng(4242);
+        const coarse = [];
+        const gw = 13, gh = Math.max(3, Math.round(13 * h / w));
+        for (let i = 0; i < gw * gh; i++) coarse.push(rand());
+        const noise = new Float32Array(nw * nh);
+        for (let y = 0; y < nh; y++) {
+          for (let x = 0; x < nw; x++) {
+            const fx = x / (nw - 1) * (gw - 1), fy = y / (nh - 1) * (gh - 1);
+            const x0 = Math.floor(fx), y0 = Math.floor(fy);
+            const x1 = Math.min(gw - 1, x0 + 1), y1 = Math.min(gh - 1, y0 + 1);
+            const tx = fx - x0, ty = fy - y0;
+            const a = coarse[y0 * gw + x0] * (1 - tx) + coarse[y0 * gw + x1] * tx;
+            const b = coarse[y1 * gw + x0] * (1 - tx) + coarse[y1 * gw + x1] * tx;
+            noise[y * nw + x] = (a * (1 - ty) + b * ty) * 0.75 + rand() * 0.25;
+          }
+        }
+        state.noise = noise;
+      }
+      const mask = scratch(state, "mask", nw, nh);
+      const mx = mask.getContext("2d");
+      const data = mx.createImageData(nw, nh);
+      const band = 0.08;
+      const level = p * (1 + band);
+      for (let i = 0; i < state.noise.length; i++) {
+        const v = (level - state.noise[i]) / band;
+        data.data[i * 4 + 3] = Math.max(0, Math.min(255, v * 255));
+      }
+      mx.putImageData(data, 0, 0);
+      const layer = scratch(state, "layer", w, h);
+      const lx = layer.getContext("2d");
+      lx.globalCompositeOperation = "source-over";
+      lx.clearRect(0, 0, w, h);
+      lx.drawImage(B, 0, 0, w, h);
+      lx.globalCompositeOperation = "destination-in";
+      lx.imageSmoothingEnabled = true;
+      lx.drawImage(mask, 0, 0, w, h);
+      draw(ctx, A, w, h);
+      ctx.drawImage(layer, 0, 0);
+    }
+  },
+  {
+    id: "stairsDown", label: "DXST.Transition.stairsDown", icon: "fa-solid fa-person-walking-arrow-loop-left", split: true,
+    draw(ctx, { phase, p, A, B, w, h }) {
+      fill(ctx, "#000", 1, w, h);
+      if (phase === "out") draw(ctx, A, w, h, { y: -p * h * 0.35, alpha: 1 - p * 0.9 });
+      else draw(ctx, B, w, h, { y: (1 - p) * h * 0.35, alpha: 0.1 + p * 0.9 });
+      fill(ctx, "#000", phase === "out" ? p : 1 - p, w, h);
+    }
+  },
+  {
+    id: "stairsUp", label: "DXST.Transition.stairsUp", icon: "fa-solid fa-person-walking-arrow-right", split: true,
+    draw(ctx, { phase, p, A, B, w, h }) {
+      fill(ctx, "#000", 1, w, h);
+      if (phase === "out") draw(ctx, A, w, h, { y: p * h * 0.35, alpha: 1 - p * 0.9 });
+      else draw(ctx, B, w, h, { y: -(1 - p) * h * 0.35, alpha: 0.1 + p * 0.9 });
+      fill(ctx, "#000", phase === "out" ? p : 1 - p, w, h);
+    }
+  }
+];
+
+/** The registry: id → definition. */
+export const TRANSITIONS = new Map(BUILTIN_TRANSITIONS.map(d => [d.id, d]));
+
+export function knownIds() {
+  return new Set(TRANSITIONS.keys());
+}
+
+/** Adds or replaces a transition (api.register). Returns the stored definition. */
+export function registerTransition(id, def) {
+  const key = String(id ?? "").trim();
+  if (!/^[A-Za-z][\w-]{0,40}$/.test(key) || key === "none") throw new Error(`Invalid transition id "${id}"`);
+  if (!def || typeof def.draw !== "function") throw new Error(`Transition "${key}" needs a draw(ctx, frame) function`);
+  const stored = { id: key, label: String(def.label ?? key), icon: String(def.icon ?? "fa-solid fa-film"), split: !!def.split, draw: def.draw };
+  TRANSITIONS.set(key, stored);
+  return stored;
+}

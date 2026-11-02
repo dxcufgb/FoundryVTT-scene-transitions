@@ -1,0 +1,44 @@
+{
+  "id": "dxcufgbs-scene-transitions",
+  "title": "Dxcufgb's Scene Transitions",
+  "description": "Cinematic transitions between scenes: fade through black or white, crossfade, iris, wipe, slide, curtain, blur, pixelate, zoom, tiles, dissolve and stairs up or down, with an optional title card and sound. The GM binds transitions to scene pairs, to scenes and to Stairways stairways (each end its own, also within one scene), sets a world default, and picks a transition in a dialog when activating a scene.",
+  "version": "0.1.0",
+  "authors": [
+    {
+      "name": "Dxcufgb",
+      "url": "https://github.com/Dxcufgb"
+    }
+  ],
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "url": "https://github.com/dxcufgb/FoundryVTT-scene-transitions",
+  "manifest": "https://github.com/dxcufgb/FoundryVTT-scene-transitions/releases/latest/download/module.json",
+  "download": "https://github.com/dxcufgb/FoundryVTT-scene-transitions/releases/latest/download/module.zip",
+  "bugs": "https://github.com/dxcufgb/FoundryVTT-scene-transitions/issues",
+  "readme": "https://github.com/dxcufgb/FoundryVTT-scene-transitions#readme",
+  "license": "LICENSE",
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/scene-transitions.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "relationships": {
+    "recommends": [
+      {
+        "id": "stairways",
+        "type": "module",
+        "reason": "Bind a transition to each stairway."
+      }
+    ]
+  }
+}

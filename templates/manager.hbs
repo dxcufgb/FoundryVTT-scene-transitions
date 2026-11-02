@@ -1,0 +1,83 @@
+<div class="dxst-body">
+  <section class="dxst-section">
+    <h3><i class="fa-solid fa-globe"></i> {{localize "DXST.Manager.World"}}</h3>
+    <div class="dxst-line">
+      <div class="dxst-line-label">
+        <strong>{{localize "DXST.Manager.Default"}}</strong>
+        <p class="hint">{{localize "DXST.Manager.DefaultHint"}}</p>
+      </div>
+      {{{defaultPicker}}}
+    </div>
+    {{#if stairwaysActive}}
+    <div class="dxst-line">
+      <div class="dxst-line-label">
+        <strong>{{localize "DXST.Manager.SameSceneDefault"}}</strong>
+        <p class="hint">{{localize "DXST.Manager.SameSceneDefaultHint"}}</p>
+      </div>
+      {{{sameScenePicker}}}
+    </div>
+    {{/if}}
+  </section>
+
+  <section class="dxst-section">
+    <h3><i class="fa-solid fa-map"></i> {{localize "DXST.Manager.Scene"}}</h3>
+    <select data-dxst="scene" class="dxst-scene-select">
+      {{#each scenes}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>{{/each}}
+    </select>
+  </section>
+
+  {{#if scene}}
+  <section class="dxst-section">
+    <h4>{{localize "DXST.Manager.Enter"}}</h4>
+    <div class="dxst-line">
+      <div class="dxst-line-label">
+        <strong>{{localize "DXST.Manager.EnterLabel" name=scene.name}}</strong>
+        <p class="hint">{{localize "DXST.Manager.EnterHint"}}</p>
+      </div>
+      {{{enterPicker}}}
+    </div>
+  </section>
+
+  <section class="dxst-section">
+    <h4>{{localize "DXST.Manager.From"}}</h4>
+    <p class="hint">{{localize "DXST.Manager.FromHint" name=scene.name}}</p>
+    {{#each fromRows}}
+    <div class="dxst-line" data-from-id="{{id}}">
+      <div class="dxst-line-label">
+        <strong>{{name}} <i class="fa-solid fa-arrow-right"></i> {{@root.scene.name}}</strong>
+      </div>
+      {{{picker}}}
+      <button type="button" class="dxst-icon dxst-remove" data-action="removeFrom" data-tooltip="{{localize "DXST.Manager.Remove"}}"><i class="fa-solid fa-trash"></i></button>
+    </div>
+    {{else}}
+    <p class="dxst-empty">{{localize "DXST.Manager.NoFrom"}}</p>
+    {{/each}}
+    {{#if addOptions.length}}
+    <div class="dxst-add">
+      <select data-dxst="add-from">
+        {{#each addOptions}}<option value="{{id}}">{{name}}</option>{{/each}}
+      </select>
+      <button type="button" data-action="addFrom"><i class="fa-solid fa-plus"></i> {{localize "DXST.Manager.AddFrom"}}</button>
+    </div>
+    {{/if}}
+  </section>
+
+  {{#if stairwaysActive}}
+  <section class="dxst-section">
+    <h4><i class="fa-solid fa-stairs"></i> {{localize "DXST.Manager.Stairways"}}</h4>
+    <p class="hint">{{localize "DXST.Manager.StairwaysHint"}}</p>
+    {{#each stairways}}
+    <div class="dxst-line">
+      <div class="dxst-line-label">
+        <strong>{{name}}</strong>
+        <p class="hint"><i class="fa-solid fa-arrow-right"></i> {{target}}</p>
+      </div>
+      {{{picker}}}
+    </div>
+    {{else}}
+    <p class="dxst-empty">{{localize "DXST.Manager.NoStairways"}}</p>
+    {{/each}}
+  </section>
+  {{/if}}
+  {{/if}}
+</div>

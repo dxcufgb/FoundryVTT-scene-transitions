@@ -1,0 +1,94 @@
+{
+  "DXST": {
+    "None": "None",
+    "Preview": "Preview here",
+    "PlayOnScreen": "Play on screen",
+    "MoreOptions": "Title card and sound",
+    "NothingToPreview": "Pick a transition to preview.",
+    "SaveFailed": "Scene Transitions: could not save the transition.",
+    "DisabledHere": "transitions are switched off on this client.",
+    "InheritDefault": "World default",
+    "InheritEnter": "Use the scene's own",
+    "InheritScene": "Use the scene bindings",
+    "InheritSameScene": "Same-scene default",
+    "Field": {
+      "Transition": "Transition",
+      "Duration": "Duration in seconds",
+      "DurationHint": "Duration in seconds",
+      "Title": "Show a title card",
+      "TitlePlaceholder": "Scene name",
+      "Sound": "Sound"
+    },
+    "Transition": {
+      "fade": "Fade through black",
+      "flash": "Fade through white",
+      "crossfade": "Crossfade",
+      "iris": "Iris",
+      "wipe": "Wipe",
+      "slide": "Slide",
+      "curtain": "Curtain",
+      "blur": "Blur",
+      "pixelate": "Pixelate",
+      "zoom": "Zoom",
+      "tiles": "Tiles",
+      "dissolve": "Dissolve",
+      "stairsDown": "Stairs down",
+      "stairsUp": "Stairs up"
+    },
+    "Manager": {
+      "Title": "Scene Transitions",
+      "Menu": "Transitions…",
+      "World": "World defaults",
+      "Default": "Any scene change",
+      "DefaultHint": "Used when nothing more specific is bound.",
+      "SameSceneDefault": "Same-scene stairways",
+      "SameSceneDefaultHint": "Used by stairways that teleport within one scene and have no transition of their own.",
+      "Scene": "Scene",
+      "Enter": "Entering this scene",
+      "EnterLabel": "Into {name}",
+      "EnterHint": "Plays whenever the view changes to this scene, unless a binding below matches.",
+      "From": "Coming from…",
+      "FromHint": "A transition for coming to {name} from one particular scene.",
+      "NoFrom": "No scene-specific transitions.",
+      "AddFrom": "Add",
+      "Remove": "Remove",
+      "Stairways": "Stairways on this scene",
+      "StairwaysHint": "Plays for the user who takes the stairway. Each end of a stairway has its own.",
+      "NoStairways": "This scene has no stairways.",
+      "SameScene": "this scene",
+      "UnknownScene": "a missing scene"
+    },
+    "Dialog": {
+      "Title": "Activate {name}",
+      "Intro": "Everyone moves to {name}. Pick the transition they see:",
+      "Bind": "Always use this from {from} to {to}",
+      "Activate": "Activate",
+      "NoTransition": "Without transition",
+      "Cancel": "Cancel"
+    },
+    "Stairway": {
+      "Tab": "Transition",
+      "Hint": "The transition the user sees when this stairway takes them to the other scene.",
+      "HintSame": "The transition the user sees when this stairway teleports them within the scene."
+    },
+    "Settings": {
+      "Manager": {
+        "Name": "Transitions",
+        "Label": "Open Transitions",
+        "Hint": "Bind transitions to scenes, scene pairs and stairways, and set the world default."
+      },
+      "AskOnActivate": {
+        "Name": "Ask when activating a scene",
+        "Hint": "Activating a scene opens a dialog to pick the transition, with the bound one picked. Hold Shift while clicking Activate to skip it. Off: the bound transition is used."
+      },
+      "Enabled": {
+        "Name": "Play scene transitions",
+        "Hint": "Turn off to switch scenes without transitions on this computer only."
+      },
+      "GmView": {
+        "Name": "Transitions when I only view a scene (GM)",
+        "Hint": "Play bound transitions when you, as GM, view a scene without activating it. Activating, stairways and previews always play."
+      }
+    }
+  }
+}

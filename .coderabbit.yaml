@@ -1,0 +1,26 @@
+# CodeRabbit settings for FoundryVTT-scene-transitions.
+# Shared rules come from the central dxcufgb/coderabbit repository (inheritance: true), and CodeRabbit reads
+# the README as code guidelines. Only what is specific to this repository is here.
+# Paths here must not repeat a central path (scripts/**/*.js, .github/workflows/**, **/*.sh, **/*.ps1, **/*.iss,
+# module.json, **/*.md): an entry with the same path replaces the central one instead of adding to it.
+# Check the merged result on a pull request with: @coderabbitai configuration
+inheritance: true
+
+reviews:
+  path_instructions:
+    - path: "scripts/player.js"
+      instructions: |
+        Wraps Canvas#draw. Nothing in the wrapper may throw into or delay the original draw, and the overlay must
+        always be removed (finish, cancel, timeout, error). Only one run at a time.
+    - path: "scripts/{activate,stairways}.js"
+      instructions: |
+        A transition choice arrives in scene update options or from Stairways hook data. It is untrusted: it must
+        go through sanitizeBinding before use. The PreStairwayTeleport handler must never return false.
+    - path: "scripts/bindings.js"
+      instructions: |
+        Pure logic without Foundry globals, unit tested in tests/. Keep it importable in Node.
+    - path: ".github/workflows/{ci,release}.yml"
+      instructions: |
+        Thin callers of dxcufgb/foundry-module-ci, identical in every Foundry module repository. Flag any change
+        here that is not the same change in all modules (it belongs in foundry-module-ci instead), except the
+        pinned SHA of foundry-module-ci itself.
