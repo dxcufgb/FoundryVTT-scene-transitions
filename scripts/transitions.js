@@ -5,8 +5,11 @@
  * A definition is { id, label, icon, split, draw(ctx, frame) }:
  *   split: true  → two phases: "out" (A goes away, e.g. to black) while B loads, then "in" (B appears).
  *   split: false → one "in" phase from A straight to B, once B is ready (A is held while B loads).
- *   frame = { phase: "out" | "in", p: 0..1 (eased), raw: 0..1, A, B, w, h, state }
+ *   frame = { phase: "out" | "in", p: 0..1 (eased), raw: 0..1, A, B, w, h, state, t }
  *     state is an object kept for the whole run (for random layouts and scratch canvases).
+ *     t is the time in ms since the transition started, for things that keep moving (swirls, sparkles).
+ *   hold: true (split transitions only) → while the new scene loads, the last "out" frame keeps being drawn
+ *     (p = 1, t running) instead of standing still.
  * Every size is relative to w / h, so the same code draws the full screen and the small previews.
  * Other modules can add their own with api.register(id, definition).
  */
@@ -60,6 +63,113 @@ function throughColor(color) {
     if (phase === "out") { draw(ctx, A, w, h); fill(ctx, color, p, w, h); }
     else { draw(ctx, B, w, h); fill(ctx, color, 1 - p, w, h); }
   };
+}
+
+
+/* Magic portal helpers */
+
+function drawRot(ctx, img, w, h, { scale = 1, angle = 0, alpha = 1 } = {}) {
+  if (!img) return;
+  // Never smaller than what still covers the view at this angle, so no corner shows
+  const cover = Math.abs(Math.cos(angle)) + Math.max(w / h, h / w) * Math.abs(Math.sin(angle));
+  scale = Math.max(scale, cover);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(angle);
+  ctx.scale(scale, scale);
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+
+/** Particles that orbit and fly off the portal ring, laid out once per run. */
+function portalSparks(state) {
+  if (!state.sparks) {
+    const rand = rng(777);
+    state.sparks = Array.from({ length: 70 }, () => ({
+      a: rand() * TAU, speed: 0.6 + rand() * 1.4, size: 0.4 + rand() * 1.1, drift: rand(), hue: rand() < 0.5 ? 280 : 190
+    }));
+  }
+  return state.sparks;
+}
+
+/** The swirling inside of the portal, filling a circle of radius r around the centre. */
+function drawVortex(ctx, w, h, r, t, spin) {
+  const cx = w / 2, cy = h / 2, m = Math.min(w, h);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(0.5, r), 0, TAU);
+  ctx.clip();
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(1, r));
+  g.addColorStop(0, "#fff6ff");
+  g.addColorStop(0.08, "#e6b3ff");
+  g.addColorStop(0.35, "#6a1fb5");
+  g.addColorStop(0.75, "#22074a");
+  g.addColorStop(1, "#0b0218");
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  // Spiral arms
+  const arms = 7;
+  const rot = t * 0.0025 + spin;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  for (let k = 0; k < arms; k++) {
+    ctx.beginPath();
+    for (let i = 0; i <= 40; i++) {
+      const f = i / 40;
+      const rr = f * r * 1.05;
+      const ang = rot + (k / arms) * TAU + f * 4.2;
+      const x = cx + Math.cos(ang) * rr, y = cy + Math.sin(ang) * rr;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = k % 2 ? "rgba(120, 220, 255, 0.28)" : "rgba(220, 140, 255, 0.32)";
+    ctx.lineWidth = Math.max(1, m * 0.018);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** The glowing ring at radius r, with runes and sparks orbiting it. */
+function drawRing(ctx, w, h, r, t, alpha, state, flyOut = 0) {
+  if (alpha <= 0 || r <= 0.5) return;
+  const cx = w / 2, cy = h / 2, m = Math.min(w, h);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = "lighter";
+  const lw = Math.max(1.5, m * 0.012);
+  for (const [color, width, blur] of [["rgba(160, 80, 255, 0.55)", lw * 4, m * 0.04], ["rgba(120, 220, 255, 0.8)", lw * 1.6, m * 0.02], ["rgba(255, 255, 255, 0.95)", lw * 0.6, 0]]) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, TAU);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = blur;
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  // Runes: short dashes on a second, counter-rotating ring
+  const runes = 24, rr = r * 1.06 + lw * 2;
+  ctx.strokeStyle = "rgba(200, 160, 255, 0.85)";
+  ctx.lineWidth = Math.max(1, lw * 0.7);
+  for (let i = 0; i < runes; i++) {
+    const a = -t * 0.0012 + (i / runes) * TAU;
+    const len = (i % 3 === 0 ? 0.09 : 0.05);
+    ctx.beginPath();
+    ctx.arc(cx, cy, rr, a, a + len);
+    ctx.stroke();
+  }
+  // Sparks orbiting the ring, flung outward by flyOut (0..1)
+  for (const s of portalSparks(state)) {
+    const a = s.a + t * 0.0009 * s.speed;
+    const out = r * (1 + 0.05 * Math.sin(t * 0.004 + s.drift * 9)) + flyOut * m * 0.6 * s.speed;
+    const x = cx + Math.cos(a) * out, y = cy + Math.sin(a) * out;
+    const size = Math.max(0.8, m * 0.004 * s.size * (1 - flyOut * 0.6));
+    ctx.fillStyle = `hsla(${s.hue}, 100%, 80%, ${0.9 * (1 - flyOut)})`;
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 export const BUILTIN_TRANSITIONS = [
@@ -321,6 +431,37 @@ export const BUILTIN_TRANSITIONS = [
       draw(ctx, B, w, h, { scale: 1 + 4 * k * k, alpha: smooth(0, 0.5, p) });
       ctx.restore();
     }
+  },
+  {
+    // A glowing portal opens, you step through its swirling vortex, and the new scene opens out of it
+    id: "portal", label: "DXST.Transition.portal", icon: "fa-solid fa-ring", split: true, hold: true,
+    draw(ctx, { phase, p, raw, A, B, w, h, state, t = 0 }) {
+      const R = Math.hypot(w, h) / 2;
+      const m = Math.min(w, h);
+      if (phase === "out") {
+        // Open (first 45%), then move towards it until the vortex fills the view
+        const open = smooth(0, 0.45, raw);
+        const near = smooth(0.4, 1, raw);
+        const pop = open <= 0 ? 0 : 1 + 2.2 * Math.pow(open - 1, 3) + 1.2 * Math.pow(open - 1, 2); // ease out, small overshoot
+        const r = m * 0.26 * pop + near * near * (R * 1.15 - m * 0.26);
+        drawRot(ctx, A, w, h, { scale: 1 + near * near * 0.8, angle: near * 0.15 });
+        fill(ctx, "#0b0218", open * 0.35 + near * 0.4, w, h);
+        drawVortex(ctx, w, h, Math.max(0, r), t, 0);
+        drawRing(ctx, w, h, Math.max(0, r), t, 1 - smooth(0.85, 1, raw), state);
+      } else {
+        // The new scene opens out of the vortex centre, the ring rushing past the viewer
+        const r = R * 1.2 * p;
+        drawVortex(ctx, w, h, R * 1.5, t, 0);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, Math.max(0.5, r), 0, TAU);
+        ctx.clip();
+        drawRot(ctx, B, w, h, { scale: 1.35 - 0.35 * p, angle: -(1 - p) * 0.5 });
+        ctx.restore();
+        drawRing(ctx, w, h, r, t, 1 - smooth(0.6, 1, p), state, smooth(0.3, 1, p));
+        fill(ctx, "#ffffff", Math.max(0, 1 - Math.abs(p - 0.08) / 0.08) * 0.35, w, h);
+      }
+    }
   }
 ];
 
@@ -336,7 +477,10 @@ export function registerTransition(id, def) {
   const key = String(id ?? "").trim();
   if (!/^[A-Za-z][\w-]{0,40}$/.test(key) || key === "none") throw new Error(`Invalid transition id "${id}"`);
   if (!def || typeof def.draw !== "function") throw new Error(`Transition "${key}" needs a draw(ctx, frame) function`);
-  const stored = { id: key, label: String(def.label ?? key), icon: String(def.icon ?? "fa-solid fa-film"), split: !!def.split, draw: def.draw };
+  const stored = {
+    id: key, label: String(def.label ?? key), icon: String(def.icon ?? "fa-solid fa-film"),
+    split: !!def.split, hold: !!def.split && !!def.hold, draw: def.draw
+  };
   TRANSITIONS.set(key, stored);
   return stored;
 }

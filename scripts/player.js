@@ -90,8 +90,9 @@ function playSound(src) {
 }
 
 class Run {
-  constructor(def, binding, A, { kind, title, context, claimFor = null }) {
+  constructor(def, binding, A, { kind, title, context, claimFor = null, previewB = null }) {
     this.def = def;
+    this.previewB = previewB;
     this.claimFor = claimFor;
     this.binding = binding;
     this.kind = kind;
@@ -108,6 +109,7 @@ class Run {
   }
 
   start() {
+    this.t0 = performance.now();
     const el = document.createElement("div");
     el.id = "dxst-overlay";
     el.className = "dxst-overlay";
@@ -131,7 +133,7 @@ class Run {
     if (this.titleWhen === "before") this.scheduleTitle(0);
     else if (this.titleWhen === "during" && this.def.split) this.scheduleTitle(this.durations.out * 0.6);
     this.outDone = this.def.split
-      ? animate(this.durations.out, raw => this.frame("out", raw), () => this.cancelled)
+      ? animate(this.durations.out, raw => this.frame("out", raw), () => this.cancelled).then(() => this.hold())
       : Promise.resolve();
 
     const timeout = this.kind === "local" ? LOCAL_TIMEOUT : SCENE_TIMEOUT;
@@ -145,8 +147,20 @@ class Run {
     const { ctx, w, h } = this;
     ctx.save();
     ctx.clearRect(0, 0, w, h);
-    this.def.draw(ctx, { phase, p: ease(raw), raw, A: this.A, B: this.B, w, h, state: this.state });
+    const t = performance.now() - this.t0;
+    this.def.draw(ctx, { phase, p: ease(raw), raw, A: this.A, B: this.B, w, h, state: this.state, t });
     ctx.restore();
+  }
+
+  /** Transitions with hold: true keep moving (p = 1) while the new scene loads, until the "in" phase starts. */
+  hold() {
+    if (!this.def.hold || this.cancelled) return;
+    const loop = () => {
+      if (this.cancelled || this.inStarted) return;
+      try { this.frame("out", 1); } catch (err) { console.error(`${MODULE_ID} | frame failed`, err); return; }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
   }
 
   /** The scene change this run was started for has begun: keep waiting for canvasReady. */
@@ -176,7 +190,8 @@ class Run {
     await nextFrame();
     await nextFrame();
     if (this.cancelled) return;
-    this.B = (this.kind === "preview" ? this.A : snapshotCanvas()) ?? blank(this.w, this.h);
+    this.B = (this.kind === "preview" ? (this.previewB ?? this.A) : snapshotCanvas()) ?? blank(this.w, this.h);
+    this.inStarted = true;
     if (this.titleWhen === "during" && !this.def.split) this.scheduleTitle(this.durations.in * 0.3);
     await animate(this.durations.in, raw => this.frame("in", raw), () => this.cancelled);
     if (this.cancelled) return;
@@ -223,7 +238,7 @@ class Run {
  * keeps this run instead of starting a new one.
  * Returns the run, or null when nothing plays.
  */
-export function startRun(binding, { A = null, kind = "scene", title = "", context = {}, claimFor = null } = {}) {
+export function startRun(binding, { A = null, kind = "scene", title = "", context = {}, claimFor = null, previewB = null } = {}) {
   if (!binding || binding.transition === NONE) return null;
   // A hidden tab gets no animation frames, so the overlay would hang there until the user comes back
   if (document.hidden) return null;
@@ -234,7 +249,7 @@ export function startRun(binding, { A = null, kind = "scene", title = "", contex
   const finalDef = TRANSITIONS.get(ctx.binding?.transition) ?? def;
   if (ctx.binding?.transition === NONE) return null;
   current?.cancel();
-  const run = new Run(finalDef, ctx.binding ?? binding, A ?? snapshotCanvas(), { kind, title, context: ctx, claimFor });
+  const run = new Run(finalDef, ctx.binding ?? binding, A ?? snapshotCanvas(), { kind, title, context: ctx, claimFor, previewB });
   current = run;
   run.start();
   return run;
@@ -304,10 +319,55 @@ export function onCanvasReady() {
   if (current?.kind === "scene" && !current.claimFor) current.arrive();
 }
 
-/** Plays a binding over the current view (A → A), for trying it out. */
-export function previewOnScreen(binding, title = "") {
+/** Loads an image, or resolves null. */
+function loadImage(src) {
+  if (!src) return Promise.resolve(null);
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+/**
+ * The "new scene" picture for an on-screen preview: the target scene's thumbnail, scaled to cover the view, or else
+ * a recoloured copy of the current view, so one-phase transitions (crossfade, wipe…) visibly change something.
+ */
+async function previewPicture(A, toScene) {
+  const w = A.width, h = A.height;
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const x = c.getContext("2d");
+  const img = toScene && toScene.id !== canvas.scene?.id ? await loadImage(toScene.thumb) : null;
+  if (img) {
+    const scale = Math.max(w / img.width, h / img.height);
+    x.drawImage(img, (w - img.width * scale) / 2, (h - img.height * scale) / 2, img.width * scale, img.height * scale);
+  } else {
+    x.filter = "hue-rotate(150deg) saturate(1.3) brightness(0.85)";
+    x.drawImage(A, 0, 0);
+    x.filter = "none";
+  }
+  return c;
+}
+
+/**
+ * Plays a binding over the current view, for trying it out. The "new scene" is toScene's thumbnail when given (and
+ * not the scene on screen), otherwise a recoloured copy of the view.
+ */
+export async function previewOnScreen(binding, title = "", toScene = null) {
   if (!canvas?.ready) return null;
-  return startRun(binding, { kind: "preview", title: binding.title ? (binding.titleText || title || sceneName(canvas.scene)) : "", context: { preview: true } });
+  const A = snapshotCanvas();
+  if (!A) return null;
+  const previewB = await previewPicture(A, toScene);
+  const name = sceneName(toScene) || title || sceneName(canvas.scene);
+  return startRun(binding, {
+    A,
+    previewB,
+    kind: "preview",
+    title: binding.title ? (binding.titleText || name) : "",
+    context: { preview: true }
+  });
 }
 
 export { titleFor };

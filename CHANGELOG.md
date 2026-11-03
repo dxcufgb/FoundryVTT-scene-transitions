@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- New transition **Magic portal**: a glowing portal with a swirling vortex opens in the scene, you move into it, and the new scene opens out of its centre as the ring and its sparks rush past you. The vortex keeps swirling while the new scene loads.
+- **Play on screen** now plays from your view into the other scene's thumbnail (or a recoloured copy of your view when there is none). Before, it played from your view into the same picture, so one-step transitions such as Wipe and Crossfade looked like they did nothing.
+- API: transitions get `frame.t` (ms since the start) and can set `hold: true` to keep moving while the new scene loads; `preview(binding, toScene)`.
+
 ## 0.1.0
 
 - First version.
