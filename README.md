@@ -21,122 +21,22 @@ In Foundry: **Add-on Modules → Install Module**, paste this link into **Manife
 https://github.com/dxcufgb/FoundryVTT-scene-transitions/releases/latest/download/module.json
 ```
 
-## Features
+[Stairways](https://foundryvtt.com/packages/stairways) is optional. See [Installation](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/Installation) in the wiki.
 
-### Transitions
+## Documentation
 
-| Transition | What it does |
-|---|---|
-| Fade through black | The old scene fades to black, the new one fades in. |
-| Fade through white | The same through white: a flash, for magic or teleports. |
-| Crossfade | The old scene fades straight into the new one. |
-| Iris | A circle closes on the old scene and opens on the new one. |
-| Wipe | The new scene sweeps in from the left with a soft edge. |
-| Slide | The old scene slides out to the left as the new one slides in. |
-| Curtain | The old scene opens like two doors onto the new one. |
-| Blur | The old scene blurs away and the new one comes into focus. |
-| Pixelate | The old scene breaks into blocks, the new one resolves from them. |
-| Zoom | Moving forward: the old scene zooms in and fades, the new one settles in. |
-| Tiles | The new scene appears tile by tile. |
-| Dissolve | The new scene seeps in through drifting blobs. |
-| Stairs down / Stairs up | The old scene moves up (or down) into darkness and the new one rises from the other side. |
-| Stairs down: pass through | The old scene rushes towards you until it passes your point of view, revealing the new scene below. |
-| Stairs up: from behind | The new scene comes from behind you, over your head, and settles into view as the old one sinks away. |
-| Magic portal | A glowing portal opens in the scene: a whirlpool of violet and blue light inside, a ring of drifting magic smoke, flickering lightning and sparkles around it. You move into it, and the new scene opens out of its centre as the ring rushes past you. The vortex keeps swirling while the new scene loads. |
-| Burn away | The old scene catches fire at the bottom and burns upward: a ragged glowing edge with flames, scorch marks and rising embers, the new scene showing where it has burnt through. |
-| Smoke | Smoke billows up from the bottom until it fills the view, keeps drifting while the new scene loads, then clears from the middle outward. |
-| Shatter | The old scene cracks like glass and breaks apart from the middle, the shards tumbling away to reveal the new scene. |
-| Lightning strike | The scene darkens as a storm comes in, lightning strikes a few times, and a final strike floods everything with white light that fades onto the new scene. |
-| Ink wash | Blots of the new scene bleed into the old one like ink on wet paper, with dark wet edges, until they meet. |
-| Frost | Frost creeps in from the edges until the view is frozen over; cracks race out from the middle and the ice falls away to reveal the new scene. |
-| Page turn | The old scene is turned like a book page from the bottom-right corner, showing its pale back and a soft shadow, uncovering the new scene. |
-| Old film | The picture turns into an old film reel (sepia, grain, scratches, flicker, a jittering frame) until the frame jams and burns through; the new reel starts overexposed and settles. |
-| Sandstorm | A sandstorm blows in from the side until the view is lost in sand, keeps raging while the new scene loads, then dies down over the new scene. |
-| Rain on glass | Rain runs down the glass in front of the view while the old scene blurs into the new one behind it; each drop shows the scene upside down. |
+The full guide is in the [wiki](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki):
 
-Each binding also has a **duration**, an optional **title card** (the scene's name, or your own text) and an optional **sound**. The title card shows **before** (from the start, over the scene you leave), **during** (around the middle) or **after** the transition (over the new scene once it's live). Before and during never pause the transition: the text fades in and out while it plays. The sidebar and other UI stay usable during a transition.
+- [Transitions](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/Transitions): every transition, durations, title cards and sounds
+- [Which Transition Plays](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/Which-Transition-Plays): explicit choice, scene pairs, entering a scene, the world default
+- [The Transitions Manager](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/The-Transitions-Manager): bind transitions to scenes and pairs of scenes, with previews
+- [Activating a Scene](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/Activating-a-Scene): the dialog, saving a choice, skipping it with Shift
+- [Stairways](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/Stairways): a transition per stairway end and the film badges
+- [Who Sees What](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/Who-Sees-What): who gets a transition when
+- [Settings](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/Settings): the module's options
+- [API](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/API): for macro and module authors: calls, hooks and scene flags
+- [Compatibility](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/Compatibility): Stairways and the disabled canvas
 
-### Which transition plays
+## License
 
-The first match wins:
-
-1. **The explicit choice:** the one picked when activating the scene, or the stairway's own transition.
-2. **Coming from a particular scene:** a binding for scene A → scene B.
-3. **Entering the scene:** scene B's own transition.
-4. **The world default** (fade through black to start with). Set it to *None* to have transitions only where you bound them.
-
-### The Transitions manager
-
-Right-click a scene in the Scenes directory or the scene navigation and choose **Transitions…**, or open **Module Settings → Transitions**. It has:
-
-- **World defaults:** the transition for any scene change, and for stairways that teleport within one scene.
-- **Entering this scene:** the scene's own transition.
-- **Coming from…:** a transition for coming from one particular scene. Add a row per scene.
-- **Stairways on this scene:** one transition per stairway end (with Stairways enabled).
-
-Every row has ▶ to preview the transition between the two scenes' thumbnails, and a screen button to play it over your view, from what you see now to the other scene's thumbnail (or a recoloured copy of your view when there's no other scene). Changes are saved at once.
-
-### Activating a scene
-
-Activating a scene, from the Scenes directory or the navigation bar, opens a small dialog with the bound transition already picked, a preview, and **Always use this from A to B** to save the choice as a binding. **Activate** plays it for everyone, and **Without transition** switches without one. Hold **Shift** while clicking *Activate* to skip the dialog and use the bound transition.
-
-### Stairways
-
-With [Stairways](https://foundryvtt.com/packages/stairways) enabled, each end of a stairway can have its own transition: stairs down one way, stairs up the other. The GM sees a small **film badge** on the corner of every stairway icon. It's lit orange when that end has its own transition, and hovering shows which one. Click the badge (it doesn't teleport) to open a small editor for that end, with a preview and an **Edit** button for the other end, wherever it is. The stairway config also has a **Transition** tab. Only the user who takes the stairway sees it, because only their view changes. It starts the moment they click, so the tokens leaving the scene are already covered. Stairways within one scene play their transition too, and the view pans to where you arrive. A stairway left on *inherit* uses the scene bindings (or, within a scene, the same-scene default).
-
-### Who sees what
-
-- **Activating a scene:** everyone who switches to it.
-- **Stairways:** the user who takes the stairway.
-- **Players pulled to a scene:** their bound transition.
-- **A GM just viewing a scene:** no transition unless the GM turns it on (setting below), so you can click through scenes while preparing.
-
-## Settings
-
-| Setting | Scope | What it does |
-|---|---|---|
-| Transitions | GM | Opens the Transitions manager. |
-| Ask when activating a scene | World | Activating a scene opens the transition dialog. Off: the bound transition is used. |
-| Play scene transitions | Each user | Turn off to switch scenes without transitions on this computer. |
-| Transitions when I only view a scene | Each GM | Play bound transitions when the GM views a scene without activating it. Hidden from players. |
-
-## API / integration
-
-`game.modules.get("dxcufgbs-scene-transitions").api`, ready from the `ready` hook:
-
-| Member | Does |
-|---|---|
-| `transitions` | `[{id, label, icon, split, hold, group}]`: the registered transitions. |
-| `register(id, definition)` | Adds a transition. `definition = {label, icon, split, hold?, group?, draw(ctx, frame)}`, where `frame = {phase: "out" \| "in", p, raw, A, B, w, h, state, t}` (`t`: ms since the transition started). `A` and `B` are canvases of the old and new scene (`B` only in `"in"`), `p` runs from 0 to 1 eased. `split: true` plays `"out"` while the new scene loads, then `"in"`. `split: false` plays only `"in"` (A → B). `hold: true` (split only) keeps drawing the last `"out"` frame with `t` running while the new scene loads. `group` (`classic`, `stairs`, `cinematic`) picks the heading it's listed under; anything else is listed under "From other modules". |
-| `resolve({from, to, explicit?})` | `{binding, source}`: the binding a change from → to uses on this client (`source` is `explicit`, `pair`, `enter` or `default`). |
-| `activate(scene, binding?)` | GM: activates a scene for everyone with this binding, without the dialog. Without a binding, everyone gets their bound transition. Pass `{transition: "none"}` for none. |
-| `view(scene, binding?)` | Views a scene on this client with this binding (or the bound one). |
-| `preview(binding, toScene?)` | Plays a binding over the current view on this client, into `toScene`'s thumbnail (a scene or id), or into a recoloured copy of the view. |
-| `sanitize(binding)` | Returns a clean binding. |
-| `openManager(sceneId?)` | GM: opens the Transitions manager. |
-
-A **binding** is `{transition, duration, title, titleText, titleWhen, sound}`: `transition` is a transition id, `"none"`, or `""` (inherit). `duration` is in milliseconds (200–10000). `titleWhen` is `"before"`, `"during"` (default) or `"after"`.
-
-**Hooks**
-
-- `dxcufgbsPreSceneTransition(context)`: return `false` to cancel. `context.binding` can be changed.
-- `dxcufgbsSceneTransitionStart(context)` and `dxcufgbsSceneTransitionEnd(context)`.
-- `context = {binding, kind, from, to, source, stairway?}`, where `kind` is `"scene"`, `"local"` (a same-scene stairway) or `"preview"`.
-
-**Flags** (on scenes, written by the GM)
-
-- `flags.dxcufgbs-scene-transitions.enter`: the scene's "entering" binding.
-- `flags.dxcufgbs-scene-transitions.from.<sourceSceneId>`: coming from that scene.
-- `flags.dxcufgbs-scene-transitions.stairways.<stairwayId>`: a Stairways stairway end on this scene.
-
-Adventures exported with these flags keep their transitions when imported (scene ids are kept).
-
-## Credits
-
-The textures of the Magic portal, Burn away, Smoke, Lightning strike and Sandstorm come from Kenney's [Particle Pack](https://kenney.nl/assets/particle-pack) (CC0). See `assets/textures/LICENSE.txt`.
-
-## Compatibility
-
-- Foundry VTT v13, any game system.
-- [Stairways](https://foundryvtt.com/packages/stairways) (optional) for stairway transitions.
-- With the canvas switched off ("Disable game canvas"), no transitions play.
+[MIT](LICENSE)
