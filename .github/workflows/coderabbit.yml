@@ -1,0 +1,32 @@
+# Asks CodeRabbit to review every pull request. Identical in every dxcufgb repository that CodeRabbit reviews.
+# CodeRabbit skips automatic reviews on repositories with fewer than 10 stars, but still answers a
+# "@coderabbitai review" comment, so this workflow posts one when a pull request is opened, updated, reopened or
+# marked ready for review. Drafts, bot-opened PRs (Dependabot, Renovate) and PRs from forks are skipped (their
+# token cannot comment); comment "@coderabbitai review" on those by hand.
+
+name: CodeRabbit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+jobs:
+  review:
+    name: Ask CodeRabbit for a review
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.user.type != 'Bot' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: coderabbit-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      pull-requests: write # post the comment
+    steps:
+      - uses: dxcufgb/foundry-module-ci/coderabbit@ff8c51918139ce95887eddf86a7a784dc47786ab # feature/coderabbit-review (test pin)
+        with:
+          github-token: ${{ github.token }}
