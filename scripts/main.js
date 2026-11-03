@@ -7,7 +7,7 @@
  *
  * API: game.modules.get("dxcufgbs-scene-transitions").api
  *   transitions                    → [{id, label, icon, split}] the registered transitions
- *   register(id, definition)       → adds a transition: {label, icon, split, hold?, draw(ctx, frame)} (see scripts/transitions.js)
+ *   register(id, definition)       → adds a transition: {label, icon, split, hold?, group?, draw(ctx, frame)} (see scripts/transitions.js)
  *   resolve({from, to, explicit?}) → {binding, source} the binding a change from → to uses on this client
  *   activate(scene, binding?)      → GM: activates a scene for everyone with this binding (no dialog); without a
  *                                    binding each client uses its bound transition; {transition: "none"} for none
@@ -105,7 +105,7 @@ Hooks.once("ready", () => {
   const mod = game.modules.get(MODULE_ID);
   mod.api = {
     get transitions() {
-      return [...TRANSITIONS.values()].map(d => ({ id: d.id, label: game.i18n.localize(d.label), icon: d.icon, split: d.split, hold: !!d.hold }));
+      return [...TRANSITIONS.values()].map(d => ({ id: d.id, label: game.i18n.localize(d.label), icon: d.icon, split: d.split, hold: !!d.hold, group: d.group }));
     },
     register: (id, definition) => registerTransition(id, definition),
     resolve: ({ from, to, explicit = null } = {}) => {

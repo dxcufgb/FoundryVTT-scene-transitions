@@ -42,7 +42,12 @@
       "smoke": "Smoke",
       "shatter": "Shatter",
       "lightning": "Lightning strike",
-      "ink": "Ink wash"
+      "ink": "Ink wash",
+      "frost": "Frost",
+      "pageTurn": "Page turn",
+      "film": "Old film",
+      "sandstorm": "Sandstorm",
+      "rain": "Rain on glass"
     },
     "Manager": {
       "Title": "Scene Transitions",
@@ -116,6 +121,12 @@
       "before": "Before (over this scene)",
       "during": "During (halfway)",
       "after": "After (over the new scene)"
+    },
+    "Group": {
+      "classic": "Classic",
+      "stairs": "Stairs",
+      "cinematic": "Cinematic",
+      "custom": "From other modules"
     }
   }
 }

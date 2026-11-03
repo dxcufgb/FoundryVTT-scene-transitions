@@ -47,6 +47,11 @@ https://github.com/dxcufgb/FoundryVTT-scene-transitions/releases/latest/download
 | Shatter | The old scene cracks like glass and breaks apart from the middle, the shards tumbling away to reveal the new scene. |
 | Lightning strike | The scene darkens as a storm comes in, lightning strikes a few times, and a final strike floods everything with white light that fades onto the new scene. |
 | Ink wash | Blots of the new scene bleed into the old one like ink on wet paper, with dark wet edges, until they meet. |
+| Frost | Frost creeps in from the edges until the view is frozen over; cracks race out from the middle and the ice falls away to reveal the new scene. |
+| Page turn | The old scene is turned like a book page from the bottom-right corner, showing its pale back and a soft shadow, uncovering the new scene. |
+| Old film | The picture turns into an old film reel (sepia, grain, scratches, flicker, a jittering frame) until the frame jams and burns through; the new reel starts overexposed and settles. |
+| Sandstorm | A sandstorm blows in from the side until the view is lost in sand, keeps raging while the new scene loads, then dies down over the new scene. |
+| Rain on glass | Rain runs down the glass in front of the view while the old scene blurs into the new one behind it; each drop shows the scene upside down. |
 | Stairs up: from behind | The new scene comes from behind you, over your head, and settles into view as the old one sinks away. |
 
 Each binding also has a **duration**, an optional **title card** (the scene's name, or your own text) and an optional **sound**. The title card shows **before** (from the start, over the scene you leave), **during** (around the middle) or **after** the transition (over the new scene once it's live). Before and during never pause the transition: the text fades in and out while it plays. The sidebar and other UI stay usable during a transition.
@@ -101,8 +106,8 @@ With [Stairways](https://foundryvtt.com/packages/stairways) enabled, each end of
 
 | Member | Does |
 |---|---|
-| `transitions` | `[{id, label, icon, split}]`: the registered transitions. |
-| `register(id, definition)` | Adds a transition. `definition = {label, icon, split, hold?, draw(ctx, frame)}`, where `frame = {phase: "out" \| "in", p, raw, A, B, w, h, state, t}` (`t`: ms since the transition started). `A` and `B` are canvases of the old and new scene (`B` only in `"in"`), `p` runs from 0 to 1 eased. `split: true` plays `"out"` while the new scene loads, then `"in"`. `split: false` plays only `"in"` (A → B). `hold: true` (split only) keeps drawing the last `"out"` frame with `t` running while the new scene loads. |
+| `transitions` | `[{id, label, icon, split, hold, group}]`: the registered transitions. |
+| `register(id, definition)` | Adds a transition. `definition = {label, icon, split, hold?, group?, draw(ctx, frame)}`, where `frame = {phase: "out" \| "in", p, raw, A, B, w, h, state, t}` (`t`: ms since the transition started). `A` and `B` are canvases of the old and new scene (`B` only in `"in"`), `p` runs from 0 to 1 eased. `split: true` plays `"out"` while the new scene loads, then `"in"`. `split: false` plays only `"in"` (A → B). `hold: true` (split only) keeps drawing the last `"out"` frame with `t` running while the new scene loads. `group` (`classic`, `stairs`, `cinematic`) picks the heading it's listed under; anything else is listed under "From other modules". |
 | `resolve({from, to, explicit?})` | `{binding, source}`: the binding a change from → to uses on this client (`source` is `explicit`, `pair`, `enter` or `default`). |
 | `activate(scene, binding?)` | GM: activates a scene for everyone with this binding, without the dialog. Without a binding, everyone gets their bound transition. Pass `{transition: "none"}` for none. |
 | `view(scene, binding?)` | Views a scene on this client with this binding (or the bound one). |

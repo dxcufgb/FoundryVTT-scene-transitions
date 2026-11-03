@@ -531,6 +531,10 @@ export const BUILTIN_TRANSITIONS = [
 ];
 
 /** The registry: id → definition. */
+/** Which group each transition is listed under in the pickers. */
+for (const def of BUILTIN_TRANSITIONS) def.group ??= def.id.startsWith("stairs") ? "stairs" : def.id === "portal" ? "cinematic" : "classic";
+for (const def of CINEMATIC_TRANSITIONS) def.group ??= "cinematic";
+
 export const TRANSITIONS = new Map([...BUILTIN_TRANSITIONS, ...CINEMATIC_TRANSITIONS].map(d => [d.id, d]));
 
 export function knownIds() {
@@ -544,7 +548,8 @@ export function registerTransition(id, def) {
   if (!def || typeof def.draw !== "function") throw new Error(`Transition "${key}" needs a draw(ctx, frame) function`);
   const stored = {
     id: key, label: String(def.label ?? key), icon: String(def.icon ?? "fa-solid fa-film"),
-    split: !!def.split, hold: !!def.split && !!def.hold, draw: def.draw
+    split: !!def.split, hold: !!def.split && !!def.hold, draw: def.draw,
+    group: ["classic", "stairs", "cinematic"].includes(def.group) ? def.group : "custom"
   };
   TRANSITIONS.set(key, stored);
   return stored;

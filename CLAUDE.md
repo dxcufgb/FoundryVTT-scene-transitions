@@ -25,7 +25,9 @@ System-agnostic. No build step and no npm dependencies. Stairways is optional.
 - `scripts/fx.js` – drawing helpers shared by the transitions (no Foundry globals): fill/draw/drawRot/sprite, seeded
   `rng`, `smooth`, `noiseField` (fractal value noise, cached in the run state), `maskCanvas` (a small per-cell
   alpha/colour canvas, stretched over the frame for soft edges), `maskedLayer` (a picture kept only where a mask is).
-- `scripts/cinematic.js` – Burn away, Smoke, Shatter, Lightning strike, Ink wash. Masks are computed on a small grid
+- `scripts/cinematic.js` – Burn away, Smoke, Shatter, Lightning strike, Ink wash; `scripts/cinematic-extra.js` – Frost,
+  Page turn (fold = perpendicular bisector of corner→pulled point, flap drawn under a reflection), Old film, Sandstorm,
+  Rain on glass; added to the registry through `CINEMATIC_TRANSITIONS`. Masks are computed on a small grid
   (~160 wide) and stretched; only the new-scene reveal is a full-size masked layer.
 - `scripts/textures.js` + `assets/textures/*.webp` – textures for the portal, burn, smoke and lightning (Kenney
   Particle Pack, CC0, white shapes in alpha), loaded at setup; `tint` makes cached coloured sprites and

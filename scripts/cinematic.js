@@ -1,10 +1,12 @@
 /**
- * Cinematic transitions: Burn away, Smoke, Shatter, Lightning strike, Ink wash.
+ * Cinematic transitions: Burn away, Smoke, Shatter, Lightning strike, Ink wash (and, from cinematic-extra.js, Frost,
+ * Page turn, Old film, Sandstorm, Rain on glass).
  * Same definition format as scripts/transitions.js. Textured ones fall back to a procedural look until their
  * textures (scripts/textures.js) have loaded.
  */
 import { tint, texturesReady } from "./textures.js";
 import { TAU, fill, draw, rng, smooth, sprite, noiseField, maskCanvas, maskedLayer, stretch } from "./fx.js";
+import { EXTRA_TRANSITIONS, EXTRA_TINTS } from "./cinematic-extra.js";
 
 /* ---------------------------------------- */
 /*  Burn away                                */
@@ -375,12 +377,14 @@ export const CINEMATIC_TRANSITIONS = [
   { id: "smoke", label: "DXST.Transition.smoke", icon: "fa-solid fa-smog", split: true, hold: true, draw: drawSmoke },
   { id: "shatter", label: "DXST.Transition.shatter", icon: "fa-solid fa-burst", split: false, draw: drawShatter },
   { id: "lightning", label: "DXST.Transition.lightning", icon: "fa-solid fa-bolt-lightning", split: true, draw: drawLightning },
-  { id: "ink", label: "DXST.Transition.ink", icon: "fa-solid fa-paintbrush", split: false, draw: drawInk }
+  { id: "ink", label: "DXST.Transition.ink", icon: "fa-solid fa-paintbrush", split: false, draw: drawInk },
+  ...EXTRA_TRANSITIONS
 ];
 
 /** Texture/colour pairs these transitions use, tinted up front (warmTints in scripts/transitions.js). */
 export const CINEMATIC_TINTS = [
   ...FLAMES, ["flame_05", "#ffe7b0"], ["star_07", "#ffae4a"],
   ...SMOKE_TEXTURES.flatMap(tex => SMOKE_TINTS.map(color => [tex, color])),
-  ["spark_05", "#7fb0ff"], ["spark_05", "#eef6ff"], ["spark_06", "#7fb0ff"], ["spark_06", "#eef6ff"]
+  ["spark_05", "#7fb0ff"], ["spark_05", "#eef6ff"], ["spark_06", "#7fb0ff"], ["spark_06", "#eef6ff"],
+  ...EXTRA_TINTS
 ];
