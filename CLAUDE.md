@@ -12,14 +12,16 @@ System-agnostic. No build step and no npm dependencies. Stairways is optional.
 - `scripts/util.js` – `MODULE_ID`, `t()` (keys under `DXST.`), `escapeHTML`, small helpers.
 - `scripts/bindings.js` – pure logic, no Foundry globals (unit tested in `tests/`): `sanitizeBinding`,
   `resolveBinding` (explicit → pair → enter → world default), `resolveSameScene`, `phaseDurations`, `ease`.
-- `scripts/transitions.js` – the transition definitions `{id, label, icon, split, draw(ctx, frame)}` and the
+- `scripts/transitions.js` – the transition definitions `{id, label, icon, split, hold?, draw(ctx, frame)}` and the
   registry (`TRANSITIONS`, `registerTransition`). They draw on a 2D canvas from snapshot A (old scene) and B (new
   scene); every size is relative to w/h so the same code draws the full screen and the small previews.
 - `scripts/player.js` – the player. Wraps `foundry.canvas.Canvas.prototype.draw`: before the canvas draws another
   scene it snapshots the old one (render the stage, `drawImage` the WebGL view in the same task), puts it on an
   overlay inserted right after `#board` (above the canvas, below the UI, `pointer-events: none`), plays the "out"
   phase, waits for `canvasReady`, snapshots the new scene and plays the "in" phase. One run at a time; a new one
-  cancels the old. Explicit choices wait in `pending` (one, per target scene, 20 s).
+  cancels the old. Explicit choices wait in `pending` (one, per target scene, 20 s). Definitions with `hold: true`
+  keep drawing the last "out" frame (`t` running) while the new scene loads. Frames get `t` (ms since start).
+  `previewOnScreen` plays into the target scene's thumbnail (or a recoloured copy of the view), never A → A.
 - `scripts/activate.js` – wraps `Scene#activate` (GM): the Activate dialog (DialogV2), Shift skips it. The choice
   rides in the update options (`preUpdateScene` puts it in `options[MODULE_ID]`, every client's `updateScene` reads
   it), so there is no socket. Payload `{binding}`; `binding: null` means "each client uses its bound transition".

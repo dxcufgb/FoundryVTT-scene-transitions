@@ -121,7 +121,7 @@ export function wirePickers(root, { onChange, scenes } = {}) {
         const b = readPicker(el);
         const [, to] = scenes?.(key) ?? [null, null];
         if (b.transition === INHERIT || b.transition === NONE) return ui.notifications.info(t("NothingToPreview"));
-        previewOnScreen(b, sceneName(to));
+        previewOnScreen(b, sceneName(to), to);
       }
     });
   }
@@ -191,22 +191,25 @@ export async function playThumb(cv, binding, fromScene, toScene) {
   }
   const state = {};
   const d = phaseDurations(binding.duration, def.split);
-  const run = (phase, ms) => new Promise(resolve => {
+  const t0 = performance.now();
+  const run = (phase, ms, fixed = null) => new Promise(resolve => {
     const start = performance.now();
     const step = now => {
       if (cv.__dxstToken !== token) return resolve(false);
-      const raw = ms ? Math.min(1, (now - start) / ms) : 1;
+      const raw = fixed ?? (ms ? Math.min(1, (now - start) / ms) : 1);
       ctx.save();
       ctx.clearRect(0, 0, w, h);
-      try { def.draw(ctx, { phase, p: ease(raw), raw, A, B, w, h, state }); } catch (err) { console.error(`${MODULE_ID} | preview`, err); return resolve(false); }
+      try { def.draw(ctx, { phase, p: ease(raw), raw, A, B, w, h, state, t: now - t0 }); } catch (err) { console.error(`${MODULE_ID} | preview`, err); return resolve(false); }
       ctx.restore();
-      if (raw >= 1) return resolve(true);
+      if ((fixed === null && raw >= 1) || (fixed !== null && now - start >= ms)) return resolve(true);
       requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
   });
   await new Promise(r => setTimeout(r, 250));
   if (def.split && !(await run("out", d.out))) return;
-  await new Promise(r => setTimeout(r, binding.title ? 500 : 150));
+  // A short pause between the phases (where the new scene would load); "hold" transitions keep moving
+  if (def.hold) { if (!(await run("out", binding.title ? 500 : 300, 1))) return; }
+  else await new Promise(r => setTimeout(r, binding.title ? 500 : 150));
   await run("in", d.in);
 }

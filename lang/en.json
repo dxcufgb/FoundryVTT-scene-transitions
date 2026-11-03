@@ -36,7 +36,8 @@
       "stairsDown": "Stairs down",
       "stairsUp": "Stairs up",
       "stairsDownPass": "Stairs down: pass through",
-      "stairsUpBehind": "Stairs up: from behind"
+      "stairsUpBehind": "Stairs up: from behind",
+      "portal": "Magic portal"
     },
     "Manager": {
       "Title": "Scene Transitions",

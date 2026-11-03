@@ -41,6 +41,7 @@ https://github.com/dxcufgb/FoundryVTT-scene-transitions/releases/latest/download
 | Dissolve | The new scene seeps in through drifting blobs. |
 | Stairs down / Stairs up | The old scene moves up (or down) into darkness and the new one rises from the other side. |
 | Stairs down: pass through | The old scene rushes towards you until it passes your point of view, revealing the new scene below. |
+| Magic portal | A glowing portal with a swirling vortex opens in the scene, you move into it, and the new scene opens out of its centre as the ring rushes past you. The vortex keeps swirling while the new scene loads. |
 | Stairs up: from behind | The new scene comes from behind you, over your head, and settles into view as the old one sinks away. |
 
 Each binding also has a **duration**, an optional **title card** (the scene's name, or your own text) and an optional **sound**. The title card shows **before** (from the start, over the scene you leave), **during** (around the middle) or **after** the transition (over the new scene once it's live). Before and during never pause the transition: the text fades in and out while it plays. The sidebar and other UI stay usable during a transition.
@@ -63,7 +64,7 @@ Right-click a scene in the Scenes directory or the scene navigation and choose *
 - **Coming from…:** a transition for coming from one particular scene. Add a row per scene.
 - **Stairways on this scene:** one transition per stairway end (with Stairways enabled).
 
-Every row has ▶ to preview the transition between the two scenes' thumbnails, and a screen button to play it over your view. Changes are saved at once.
+Every row has ▶ to preview the transition between the two scenes' thumbnails, and a screen button to play it over your view, from what you see now to the other scene's thumbnail (or a recoloured copy of your view when there's no other scene). Changes are saved at once.
 
 ### Activating a scene
 
@@ -96,11 +97,11 @@ With [Stairways](https://foundryvtt.com/packages/stairways) enabled, each end of
 | Member | Does |
 |---|---|
 | `transitions` | `[{id, label, icon, split}]`: the registered transitions. |
-| `register(id, definition)` | Adds a transition. `definition = {label, icon, split, draw(ctx, frame)}`, where `frame = {phase: "out" \| "in", p, raw, A, B, w, h, state}`. `A` and `B` are canvases of the old and new scene (`B` only in `"in"`), `p` runs from 0 to 1 eased. `split: true` plays `"out"` while the new scene loads, then `"in"`. `split: false` plays only `"in"` (A → B). |
+| `register(id, definition)` | Adds a transition. `definition = {label, icon, split, hold?, draw(ctx, frame)}`, where `frame = {phase: "out" \| "in", p, raw, A, B, w, h, state, t}` (`t`: ms since the transition started). `A` and `B` are canvases of the old and new scene (`B` only in `"in"`), `p` runs from 0 to 1 eased. `split: true` plays `"out"` while the new scene loads, then `"in"`. `split: false` plays only `"in"` (A → B). `hold: true` (split only) keeps drawing the last `"out"` frame with `t` running while the new scene loads. |
 | `resolve({from, to, explicit?})` | `{binding, source}`: the binding a change from → to uses on this client (`source` is `explicit`, `pair`, `enter` or `default`). |
 | `activate(scene, binding?)` | GM: activates a scene for everyone with this binding, without the dialog. Without a binding, everyone gets their bound transition. Pass `{transition: "none"}` for none. |
 | `view(scene, binding?)` | Views a scene on this client with this binding (or the bound one). |
-| `preview(binding)` | Plays a binding over the current view on this client. |
+| `preview(binding, toScene?)` | Plays a binding over the current view on this client, into `toScene`'s thumbnail (a scene or id), or into a recoloured copy of the view. |
 | `sanitize(binding)` | Returns a clean binding. |
 | `openManager(sceneId?)` | GM: opens the Transitions manager. |
 

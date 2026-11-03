@@ -7,12 +7,13 @@
  *
  * API: game.modules.get("dxcufgbs-scene-transitions").api
  *   transitions                    → [{id, label, icon, split}] the registered transitions
- *   register(id, definition)       → adds a transition: {label, icon, split, draw(ctx, frame)} (see scripts/transitions.js)
+ *   register(id, definition)       → adds a transition: {label, icon, split, hold?, draw(ctx, frame)} (see scripts/transitions.js)
  *   resolve({from, to, explicit?}) → {binding, source} the binding a change from → to uses on this client
  *   activate(scene, binding?)      → GM: activates a scene for everyone with this binding (no dialog); without a
  *                                    binding each client uses its bound transition; {transition: "none"} for none
  *   view(scene, binding?)          → this client views a scene with this binding (or its bound one)
- *   preview(binding)               → plays a binding over the current view on this client
+ *   preview(binding, toScene?)     → plays a binding over the current view on this client (toScene's thumbnail as the
+ *                                    "new scene", or a recoloured copy of the view)
  *   sanitize(binding)              → a clean binding
  *   openManager(sceneId?)          → GM: opens the Transitions manager
  * A binding is {transition, duration (ms), title (bool), titleText, titleWhen ("before" | "during" | "after"), sound};
@@ -102,7 +103,7 @@ Hooks.once("ready", () => {
   const mod = game.modules.get(MODULE_ID);
   mod.api = {
     get transitions() {
-      return [...TRANSITIONS.values()].map(d => ({ id: d.id, label: game.i18n.localize(d.label), icon: d.icon, split: d.split }));
+      return [...TRANSITIONS.values()].map(d => ({ id: d.id, label: game.i18n.localize(d.label), icon: d.icon, split: d.split, hold: !!d.hold }));
     },
     register: (id, definition) => registerTransition(id, definition),
     resolve: ({ from, to, explicit = null } = {}) => {
@@ -122,7 +123,10 @@ Hooks.once("ready", () => {
       setPending(s.id, { binding: binding ? sanitizeBinding(binding, knownIds()) : null });
       return s.view();
     },
-    preview: binding => previewOnScreen(sanitizeBinding(binding, knownIds()), sceneName(canvas?.scene)),
+    preview: (binding, toScene = null) => {
+      const s = typeof toScene === "string" ? game.scenes.get(toScene) : toScene;
+      return previewOnScreen(sanitizeBinding(binding, knownIds()), sceneName(canvas?.scene), s ?? null);
+    },
     sanitize: binding => sanitizeBinding(binding, knownIds()),
     openManager: sceneId => TransitionManager.open(sceneId)
   };
