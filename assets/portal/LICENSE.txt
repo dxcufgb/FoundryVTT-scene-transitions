@@ -1,0 +1,8 @@
+Portal textures (twirl_01-03, smoke_10, light_03, magic_02, spark_02, star_07, circle_05)
+
+From "Particle Pack" (1.1) by Kenney Vleugels (www.kenney.nl), via https://github.com/Calinou/kenney-particle-pack
+Converted to WebP with the shape in the alpha channel (white colour), so the module can tint them.
+
+License: Creative Commons Zero (CC0) - http://creativecommons.org/publicdomain/zero/1.0/
+"You may use these assets in personal and commercial projects. Credit (Kenney or www.kenney.nl) would be nice but
+is not mandatory."

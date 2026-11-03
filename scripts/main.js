@@ -25,11 +25,12 @@
  *   context = {binding, kind ("scene" | "local" | "preview"), from, to, source, stairway?}
  */
 import { MODULE_ID, t, sceneName } from "./util.js";
-import { TRANSITIONS, knownIds, registerTransition } from "./transitions.js";
+import { TRANSITIONS, knownIds, registerTransition, warmPortalTints } from "./transitions.js";
 import { sanitizeBinding, NONE } from "./bindings.js";
 import { patchCanvasDraw, onCanvasReady, bindingFor, setPending, previewOnScreen } from "./player.js";
 import { patchActivate, activateWith, onPreUpdateScene, onUpdateScene } from "./activate.js";
 import { registerStairways } from "./stairways.js";
+import { loadPortalTextures } from "./portal-textures.js";
 import { TransitionManager } from "./apps/manager.js";
 
 let originalActivate = null;
@@ -73,6 +74,7 @@ Hooks.once("init", () => {
 
 Hooks.once("setup", () => {
   registerStairways();
+  loadPortalTextures().then(warmPortalTints);
 });
 
 Hooks.on("canvasReady", onCanvasReady);

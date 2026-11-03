@@ -14,6 +14,8 @@
  * Other modules can add their own with api.register(id, definition).
  */
 
+import { tint, portalTexturesReady, RING_RADIUS } from "./portal-textures.js";
+
 const TAU = Math.PI * 2;
 
 function fill(ctx, color, alpha, w, h) {
@@ -93,8 +95,131 @@ function portalSparks(state) {
   return state.sparks;
 }
 
+
+/** Draws a (tinted) square texture centred at (x, y), size px wide, turned by angle. */
+function sprite(ctx, tex, x, y, size, angle = 0, alpha = 1) {
+  if (!tex || size <= 0.5 || alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  if (angle) ctx.rotate(angle);
+  ctx.drawImage(tex, -size / 2, -size / 2, size, size);
+  ctx.restore();
+}
+
+/**
+ * Spiral arms: each arm is a run of twirl sprites that get smaller and turn further towards the centre, so together
+ * they curl inward like a whirlpool. Arms of different colours turn at their own speeds.
+ */
+const VORTEX_ARMS = [
+  { tex: "twirl_03", color: "#8a3dff", offset: 0, speed: 0.0014, alpha: 0.85 },
+  { tex: "twirl_01", color: "#d070ff", offset: TAU / 3, speed: 0.0014, alpha: 0.75 },
+  { tex: "twirl_02", color: "#55d6ff", offset: (2 * TAU) / 3, speed: 0.0014, alpha: 0.65 }
+];
+
+function drawVortexTextured(ctx, w, h, r, t, spin) {
+  const cx = w / 2, cy = h / 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(0.5, r), 0, TAU);
+  ctx.clip();
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(1, r));
+  g.addColorStop(0, "#c58cff");
+  g.addColorStop(0.15, "#4a1294");
+  g.addColorStop(0.55, "#170436");
+  g.addColorStop(1, "#05010d");
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  ctx.globalCompositeOperation = "lighter";
+  for (const arm of VORTEX_ARMS) {
+    const tex = tint(arm.tex, arm.color);
+    let size = r * 2.6;
+    for (let i = 0; i < 8; i++) {
+      // Inner parts turn faster than outer ones, like water going down a drain
+      const angle = t * arm.speed * (1 + i * 0.35) + spin + arm.offset + i * 1.15;
+      sprite(ctx, tex, cx, cy, size, angle, arm.alpha * (0.6 + 0.4 * (i / 7)));
+      size *= 0.7;
+    }
+  }
+  // The bright eye in the middle, gently pulsing
+  const pulse = 1 + 0.08 * Math.sin(t * 0.006);
+  sprite(ctx, tint("circle_05", "#f0dcff"), cx, cy, r * 0.42 * pulse, 0, 0.85);
+  sprite(ctx, tint("star_07", "#ffffff"), cx, cy, r * 0.38 * pulse, t * 0.0015, 0.5);
+  ctx.restore();
+}
+
+/** Every texture/colour pair the portal uses, tinted up front so the first frame doesn't stall. */
+const PORTAL_TINTS = [
+  ["twirl_03", "#8a3dff"], ["twirl_01", "#d070ff"], ["twirl_02", "#55d6ff"], ["circle_05", "#f0dcff"],
+  ["star_07", "#ffffff"], ["smoke_10", "#8f45ff"], ["smoke_10", "#ff6fd8"], ["light_03", "#59dcff"],
+  ["magic_02", "#c9a6ff"], ["spark_02", "#bfefff"], ["star_07", "#ffe9ff"], ["star_07", "#9fe8ff"]
+];
+
+export function warmPortalTints() {
+  for (const [name, color] of PORTAL_TINTS) tint(name, color);
+}
+
+function ringSize(name, r) {
+  return (2 * r) / (RING_RADIUS[name] ?? 0.7);
+}
+
+function drawRingTextured(ctx, w, h, r, t, alpha, state, flyOut = 0, outsideOnly = false) {
+  if (alpha <= 0 || r <= 0.5) return;
+  const cx = w / 2, cy = h / 2, m = Math.min(w, h);
+  ctx.save();
+  if (outsideOnly) {
+    // Keep the haze off the scene showing through the portal
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h);
+    ctx.arc(cx, cy, r, 0, TAU, true);
+    ctx.clip("evenodd");
+  }
+  ctx.globalCompositeOperation = "lighter";
+  // Wispy smoke around the rim, two layers turning against each other
+  sprite(ctx, tint("smoke_10", "#8f45ff"), cx, cy, ringSize("smoke_10", r * 1.06), t * 0.0007, alpha * 0.8);
+  sprite(ctx, tint("smoke_10", "#ff6fd8"), cx, cy, ringSize("smoke_10", r * 1.02), -t * 0.0011 + 1.3, alpha * 0.4);
+  // Energy turning the other way
+  sprite(ctx, tint("light_03", "#59dcff"), cx, cy, ringSize("light_03", r), -t * 0.0016, alpha * 0.6);
+  // A crisp, thin glowing edge
+  const lw = Math.max(1.2, m * 0.005);
+  for (const [color, width, blur] of [["rgba(190, 120, 255, 0.7)", lw * 3, m * 0.03], ["rgba(255, 245, 255, 0.95)", lw, m * 0.008]]) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, TAU);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = blur;
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+  // A faint ring of rune circles just outside
+  sprite(ctx, tint("magic_02", "#c9a6ff"), cx, cy, ringSize("magic_02", r * 1.12), t * 0.0009, alpha * 0.3);
+  // Crackles of lightning that flicker around the rim
+  const bolt = tint("spark_02", "#bfefff");
+  for (let i = 0; i < 4; i++) {
+    const phase = Math.floor(t / 110) + i * 7;
+    const on = ((phase * 2654435761) >>> 0) % 5 === 0;
+    if (!on) continue;
+    const a = ((((phase * 40503) >>> 0) % 360) / 360) * TAU;
+    sprite(ctx, bolt, cx + Math.cos(a) * r, cy + Math.sin(a) * r, r * 0.5, a + Math.PI / 2, alpha * 0.9);
+  }
+  // Sparkles orbiting the ring, flung outward by flyOut (0..1)
+  const star = tint("star_07", "#ffe9ff");
+  const star2 = tint("star_07", "#9fe8ff");
+  for (const sp of portalSparks(state)) {
+    const a = sp.a + t * 0.0009 * sp.speed;
+    const out = r * (1 + 0.06 * Math.sin(t * 0.004 + sp.drift * 9)) + flyOut * m * 0.6 * sp.speed;
+    const size = m * 0.06 * sp.size * (1 - flyOut * 0.5) * (0.7 + 0.3 * Math.sin(t * 0.01 + sp.drift * 20));
+    sprite(ctx, sp.hue === 280 ? star : star2, cx + Math.cos(a) * out, cy + Math.sin(a) * out, size, a, alpha * (1 - flyOut));
+  }
+  ctx.restore();
+}
+
 /** The swirling inside of the portal, filling a circle of radius r around the centre. */
 function drawVortex(ctx, w, h, r, t, spin) {
+  if (portalTexturesReady()) return drawVortexTextured(ctx, w, h, r, t, spin);
   const cx = w / 2, cy = h / 2, m = Math.min(w, h);
   ctx.save();
   ctx.beginPath();
@@ -130,7 +255,8 @@ function drawVortex(ctx, w, h, r, t, spin) {
 }
 
 /** The glowing ring at radius r, with runes and sparks orbiting it. */
-function drawRing(ctx, w, h, r, t, alpha, state, flyOut = 0) {
+function drawRing(ctx, w, h, r, t, alpha, state, flyOut = 0, outsideOnly = false) {
+  if (portalTexturesReady()) return drawRingTextured(ctx, w, h, r, t, alpha, state, flyOut, outsideOnly);
   if (alpha <= 0 || r <= 0.5) return;
   const cx = w / 2, cy = h / 2, m = Math.min(w, h);
   ctx.save();
@@ -458,7 +584,7 @@ export const BUILTIN_TRANSITIONS = [
         ctx.clip();
         drawRot(ctx, B, w, h, { scale: 1.35 - 0.35 * p, angle: -(1 - p) * 0.5 });
         ctx.restore();
-        drawRing(ctx, w, h, r, t, 1 - smooth(0.6, 1, p), state, smooth(0.3, 1, p));
+        drawRing(ctx, w, h, r, t, 1 - smooth(0.6, 1, p), state, smooth(0.3, 1, p), true);
         fill(ctx, "#ffffff", Math.max(0, 1 - Math.abs(p - 0.08) / 0.08) * 0.35, w, h);
       }
     }

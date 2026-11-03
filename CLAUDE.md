@@ -22,6 +22,9 @@ System-agnostic. No build step and no npm dependencies. Stairways is optional.
   cancels the old. Explicit choices wait in `pending` (one, per target scene, 20 s). Definitions with `hold: true`
   keep drawing the last "out" frame (`t` running) while the new scene loads. Frames get `t` (ms since start).
   `previewOnScreen` plays into the target scene's thumbnail (or a recoloured copy of the view), never A → A.
+- `scripts/portal-textures.js` + `assets/portal/*.webp` – the Magic portal's textures (Kenney Particle Pack, CC0,
+  white shapes in alpha), loaded at setup and tinted into cached coloured sprites (`tint`). Until they're loaded
+  the portal draws its procedural fallback. The release zip includes `assets` (`.github/foundry-module.json`).
 - `scripts/activate.js` – wraps `Scene#activate` (GM): the Activate dialog (DialogV2), Shift skips it. The choice
   rides in the update options (`preUpdateScene` puts it in `options[MODULE_ID]`, every client's `updateScene` reads
   it), so there is no socket. Payload `{binding}`; `binding: null` means "each client uses its bound transition".
