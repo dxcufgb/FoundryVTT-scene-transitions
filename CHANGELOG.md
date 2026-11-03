@@ -2,7 +2,19 @@
 
 ## 0.2.0
 
-- New transition **Magic portal**: a glowing portal with a swirling vortex opens in the scene, you move into it, and the new scene opens out of its centre as the ring and its sparks rush past you. The vortex keeps swirling while the new scene loads.
+- New transition **Magic portal**: a glowing portal opens in the scene, with a whirlpool of violet and blue light inside it and drifting magic smoke, flickering lightning, rune circles and sparkles around the ring (textures from Kenney's Particle Pack, CC0). The portal opens, you move into it, and the new scene opens out of its centre as the ring and its sparks rush past you. The vortex keeps swirling while the new scene loads.
+- Ten new cinematic transitions:
+  - **Burn away**: the old scene burns up from the bottom, with a ragged glowing edge, flames, scorch marks and rising embers.
+  - **Smoke**: smoke billows up until it fills the view, keeps drifting while the new scene loads, then clears from the middle outward.
+  - **Shatter**: the old scene cracks like glass and breaks apart, the shards tumbling away.
+  - **Lightning strike**: a storm darkens the scene, lightning strikes, and a final strike floods the view with white that fades onto the new scene.
+  - **Ink wash**: blots of the new scene bleed in like ink on wet paper until they meet.
+  - **Frost**: frost creeps in from the edges, cracks race out from the middle, and the ice falls away.
+  - **Page turn**: the old scene turns like a book page from the bottom-right corner.
+  - **Old film**: the picture becomes an old film reel until the frame jams and burns through; the new reel starts overexposed.
+  - **Sandstorm**: a sandstorm blows in until the view is lost in sand, keeps raging while the new scene loads, then dies down.
+  - **Rain on glass**: rain runs down the glass while the old scene blurs into the new one behind it.
+- The transition dropdowns are grouped under Classic, Stairs and Cinematic (and "From other modules").
 - **Play on screen** now plays from your view into the other scene's thumbnail (or a recoloured copy of your view when there is none). Before, it played from your view into the same picture, so one-step transitions such as Wipe and Crossfade looked like they did nothing.
 - API: transitions get `frame.t` (ms since the start) and can set `hold: true` to keep moving while the new scene loads; `preview(binding, toScene)`.
 

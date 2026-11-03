@@ -14,48 +14,9 @@
  * Other modules can add their own with api.register(id, definition).
  */
 
-const TAU = Math.PI * 2;
-
-function fill(ctx, color, alpha, w, h) {
-  if (alpha <= 0) return;
-  ctx.save();
-  ctx.globalAlpha = Math.min(1, alpha);
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, w, h);
-  ctx.restore();
-}
-
-function draw(ctx, img, w, h, { x = 0, y = 0, scale = 1, alpha = 1 } = {}) {
-  if (!img) return;
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  const sw = w * scale, sh = h * scale;
-  ctx.drawImage(img, x + (w - sw) / 2, y + (h - sh) / 2, sw, sh);
-  ctx.restore();
-}
-
-function scratch(state, key, w, h) {
-  let c = state[key];
-  if (!c) {
-    c = state[key] = document.createElement("canvas");
-  }
-  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-  return c;
-}
-
-/** Seeded pseudo-random numbers, so a preview and the real thing can share a layout. */
-function rng(seed) {
-  let s = seed >>> 0 || 1;
-  return () => {
-    s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
-    return ((s >>> 0) % 100000) / 100000;
-  };
-}
-
-function smooth(edge0, edge1, x) {
-  const k = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
-  return k * k * (3 - 2 * k);
-}
+import { tint, texturesReady } from "./textures.js";
+import { TAU, fill, draw, drawRot, scratch, rng, smooth, sprite } from "./fx.js";
+import { CINEMATIC_TRANSITIONS, CINEMATIC_TINTS } from "./cinematic.js";
 
 function throughColor(color) {
   return (ctx, f) => {
@@ -68,20 +29,6 @@ function throughColor(color) {
 
 /* Magic portal helpers */
 
-function drawRot(ctx, img, w, h, { scale = 1, angle = 0, alpha = 1 } = {}) {
-  if (!img) return;
-  // Never smaller than what still covers the view at this angle, so no corner shows
-  const cover = Math.abs(Math.cos(angle)) + Math.max(w / h, h / w) * Math.abs(Math.sin(angle));
-  scale = Math.max(scale, cover);
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate(angle);
-  ctx.scale(scale, scale);
-  ctx.drawImage(img, -w / 2, -h / 2, w, h);
-  ctx.restore();
-}
-
 /** Particles that orbit and fly off the portal ring, laid out once per run. */
 function portalSparks(state) {
   if (!state.sparks) {
@@ -93,8 +40,125 @@ function portalSparks(state) {
   return state.sparks;
 }
 
+
+/**
+ * Spiral arms: each arm is a run of twirl sprites that get smaller and turn further towards the centre, so together
+ * they curl inward like a whirlpool. Arms of different colours turn at their own speeds.
+ */
+const VORTEX_ARMS = [
+  { tex: "twirl_03", color: "#8a3dff", offset: 0, speed: 0.0014, alpha: 0.85 },
+  { tex: "twirl_01", color: "#d070ff", offset: TAU / 3, speed: 0.0014, alpha: 0.75 },
+  { tex: "twirl_02", color: "#55d6ff", offset: (2 * TAU) / 3, speed: 0.0014, alpha: 0.65 }
+];
+
+function drawVortexTextured(ctx, w, h, r, t, spin) {
+  const cx = w / 2, cy = h / 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(0.5, r), 0, TAU);
+  ctx.clip();
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(1, r));
+  g.addColorStop(0, "#c58cff");
+  g.addColorStop(0.15, "#4a1294");
+  g.addColorStop(0.55, "#170436");
+  g.addColorStop(1, "#05010d");
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  ctx.globalCompositeOperation = "lighter";
+  for (const arm of VORTEX_ARMS) {
+    const tex = tint(arm.tex, arm.color);
+    let size = r * 2.6;
+    for (let i = 0; i < 8; i++) {
+      // Inner parts turn faster than outer ones, like water going down a drain
+      const angle = t * arm.speed * (1 + i * 0.35) + spin + arm.offset + i * 1.15;
+      sprite(ctx, tex, cx, cy, size, angle, arm.alpha * (0.6 + 0.4 * (i / 7)));
+      size *= 0.7;
+    }
+  }
+  // The bright eye in the middle, gently pulsing
+  const pulse = 1 + 0.08 * Math.sin(t * 0.006);
+  sprite(ctx, tint("circle_05", "#f0dcff"), cx, cy, r * 0.42 * pulse, 0, 0.85);
+  sprite(ctx, tint("star_07", "#ffffff"), cx, cy, r * 0.38 * pulse, t * 0.0015, 0.5);
+  ctx.restore();
+}
+
+/** The textures the portal needs, and where each ring texture's ring sits (fraction of half its width). */
+const PORTAL_TEXTURES = ["twirl_01", "twirl_02", "twirl_03", "smoke_10", "light_03", "magic_02", "spark_02", "star_07", "circle_05"];
+const RING_RADIUS = { light_03: 0.72, smoke_10: 0.46, magic_02: 0.48 };
+
+/** Every texture/colour pair the portal uses, tinted up front so the first frame doesn't stall. */
+const PORTAL_TINTS = [
+  ["twirl_03", "#8a3dff"], ["twirl_01", "#d070ff"], ["twirl_02", "#55d6ff"], ["circle_05", "#f0dcff"],
+  ["star_07", "#ffffff"], ["smoke_10", "#8f45ff"], ["smoke_10", "#ff6fd8"], ["light_03", "#59dcff"],
+  ["magic_02", "#c9a6ff"], ["spark_02", "#bfefff"], ["star_07", "#ffe9ff"], ["star_07", "#9fe8ff"]
+];
+
+/** Tints every texture/colour pair the built-in transitions use, once the textures have loaded. */
+export function warmTints() {
+  for (const [name, color] of [...PORTAL_TINTS, ...CINEMATIC_TINTS]) tint(name, color);
+}
+
+function ringSize(name, r) {
+  return (2 * r) / (RING_RADIUS[name] ?? 0.7);
+}
+
+function drawRingTextured(ctx, w, h, r, t, alpha, state, flyOut = 0, outsideOnly = false) {
+  if (alpha <= 0 || r <= 0.5) return;
+  const cx = w / 2, cy = h / 2, m = Math.min(w, h);
+  ctx.save();
+  if (outsideOnly) {
+    // Keep the haze off the scene showing through the portal
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h);
+    ctx.arc(cx, cy, r, 0, TAU, true);
+    ctx.clip("evenodd");
+  }
+  ctx.globalCompositeOperation = "lighter";
+  // Wispy smoke around the rim, two layers turning against each other
+  sprite(ctx, tint("smoke_10", "#8f45ff"), cx, cy, ringSize("smoke_10", r * 1.06), t * 0.0007, alpha * 0.8);
+  sprite(ctx, tint("smoke_10", "#ff6fd8"), cx, cy, ringSize("smoke_10", r * 1.02), -t * 0.0011 + 1.3, alpha * 0.4);
+  // Energy turning the other way
+  sprite(ctx, tint("light_03", "#59dcff"), cx, cy, ringSize("light_03", r), -t * 0.0016, alpha * 0.6);
+  // A crisp, thin glowing edge
+  const lw = Math.max(1.2, m * 0.005);
+  for (const [color, width, blur] of [["rgba(190, 120, 255, 0.7)", lw * 3, m * 0.03], ["rgba(255, 245, 255, 0.95)", lw, m * 0.008]]) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, TAU);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = blur;
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+  // A faint ring of rune circles just outside
+  sprite(ctx, tint("magic_02", "#c9a6ff"), cx, cy, ringSize("magic_02", r * 1.12), t * 0.0009, alpha * 0.3);
+  // Crackles of lightning that flicker around the rim
+  const bolt = tint("spark_02", "#bfefff");
+  for (let i = 0; i < 4; i++) {
+    const phase = Math.floor(t / 110) + i * 7;
+    const on = ((phase * 2654435761) >>> 0) % 5 === 0;
+    if (!on) continue;
+    const a = ((((phase * 40503) >>> 0) % 360) / 360) * TAU;
+    sprite(ctx, bolt, cx + Math.cos(a) * r, cy + Math.sin(a) * r, r * 0.5, a + Math.PI / 2, alpha * 0.9);
+  }
+  // Sparkles orbiting the ring, flung outward by flyOut (0..1)
+  const star = tint("star_07", "#ffe9ff");
+  const star2 = tint("star_07", "#9fe8ff");
+  for (const sp of portalSparks(state)) {
+    const a = sp.a + t * 0.0009 * sp.speed;
+    const out = r * (1 + 0.06 * Math.sin(t * 0.004 + sp.drift * 9)) + flyOut * m * 0.6 * sp.speed;
+    const size = m * 0.06 * sp.size * (1 - flyOut * 0.5) * (0.7 + 0.3 * Math.sin(t * 0.01 + sp.drift * 20));
+    sprite(ctx, sp.hue === 280 ? star : star2, cx + Math.cos(a) * out, cy + Math.sin(a) * out, size, a, alpha * (1 - flyOut));
+  }
+  ctx.restore();
+}
+
 /** The swirling inside of the portal, filling a circle of radius r around the centre. */
-function drawVortex(ctx, w, h, r, t, spin) {
+function drawVortex(ctx, w, h, r, t, spin, textured = false) {
+  if (textured) return drawVortexTextured(ctx, w, h, r, t, spin);
   const cx = w / 2, cy = h / 2, m = Math.min(w, h);
   ctx.save();
   ctx.beginPath();
@@ -130,7 +194,8 @@ function drawVortex(ctx, w, h, r, t, spin) {
 }
 
 /** The glowing ring at radius r, with runes and sparks orbiting it. */
-function drawRing(ctx, w, h, r, t, alpha, state, flyOut = 0) {
+function drawRing(ctx, w, h, r, t, alpha, state, flyOut = 0, outsideOnly = false) {
+  if (state.textured) return drawRingTextured(ctx, w, h, r, t, alpha, state, flyOut, outsideOnly);
   if (alpha <= 0 || r <= 0.5) return;
   const cx = w / 2, cy = h / 2, m = Math.min(w, h);
   ctx.save();
@@ -191,7 +256,8 @@ export const BUILTIN_TRANSITIONS = [
   {
     id: "iris", label: "DXST.Transition.iris", icon: "fa-regular fa-circle-dot", split: true,
     draw(ctx, { phase, p, A, B, w, h }) {
-      const R = Math.hypot(w, h) / 2;
+      // Just past the corners (the rim's blur too), so the first and last frames are the whole picture
+      const R = Math.hypot(w, h) / 2 + Math.max(4, Math.min(w, h) * 0.04);
       const r = phase === "out" ? (1 - p) * R : p * R;
       fill(ctx, "#000", 1, w, h);
       if (r <= 0.5) return;
@@ -250,12 +316,14 @@ export const BUILTIN_TRANSITIONS = [
   {
     id: "curtain", label: "DXST.Transition.curtain", icon: "fa-solid fa-person-booth", split: false,
     draw(ctx, { p, A, B, w, h }) {
-      const half = w / 2;
+      if (p <= 0) { draw(ctx, A, w, h); return; }
+      const half = Math.round(w / 2);
       const off = p * half;
       draw(ctx, B, w, h);
       fill(ctx, "#000", (1 - p) * 0.5, w, h);
       ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.7)";
+      // The shadow fades out with the doors, so none is left on the new scene at the end
+      ctx.shadowColor = `rgba(0,0,0,${(0.7 * (1 - p)).toFixed(3)})`;
       ctx.shadowBlur = Math.min(w, h) * 0.05;
       ctx.drawImage(A, 0, 0, half, h, -off, 0, half, h);
       ctx.drawImage(A, half, 0, w - half, h, half + off, 0, w - half, h);
@@ -267,11 +335,15 @@ export const BUILTIN_TRANSITIONS = [
     draw(ctx, { phase, p, A, B, w, h }) {
       const max = Math.max(w, h) * 0.02;
       const k = phase === "out" ? p : 1 - p;
-      ctx.save();
-      ctx.filter = k > 0.01 ? `blur(${(k * max).toFixed(1)}px)` : "none";
-      // Draw a little oversized so the blurred edges never show the background
-      draw(ctx, phase === "out" ? A : B, w, h, { scale: 1 + k * 0.06 });
-      ctx.restore();
+      const img = phase === "out" ? A : B;
+      // The sharp picture underneath, so the blurred edges never let anything show through
+      draw(ctx, img, w, h, { scale: 1 + k * 0.06 });
+      if (k > 0.01) {
+        ctx.save();
+        ctx.filter = `blur(${(k * max).toFixed(1)}px)`;
+        draw(ctx, img, w, h, { scale: 1 + k * 0.06 });
+        ctx.restore();
+      }
       fill(ctx, "#000", k * 0.55, w, h);
     }
   },
@@ -320,6 +392,7 @@ export const BUILTIN_TRANSITIONS = [
         state.tiles = { cols, rows, order };
       }
       draw(ctx, A, w, h);
+      if (p >= 1) { draw(ctx, B, w, h); return; }
       for (const cell of state.tiles.order) {
         const local = (p - cell.t) / 0.15;
         if (local <= 0) continue;
@@ -330,7 +403,9 @@ export const BUILTIN_TRANSITIONS = [
         ctx.save();
         ctx.globalAlpha = k;
         ctx.beginPath();
-        ctx.rect(sx, sy, s + 0.5, s + 0.5);
+        // A landed cell overlaps its neighbours by a pixel, so no seams of the old scene remain
+        const pad = k >= 1 ? 1 : 0.5;
+        ctx.rect(Math.floor(sx) - (k >= 1 ? 1 : 0), Math.floor(sy) - (k >= 1 ? 1 : 0), Math.ceil(s) + pad + (k >= 1 ? 1 : 0), Math.ceil(s) + pad + (k >= 1 ? 1 : 0));
         ctx.clip();
         ctx.drawImage(B, 0, 0, w, h);
         ctx.restore();
@@ -438,6 +513,9 @@ export const BUILTIN_TRANSITIONS = [
     draw(ctx, { phase, p, raw, A, B, w, h, state, t = 0 }) {
       const R = Math.hypot(w, h) / 2;
       const m = Math.min(w, h);
+      // Textured or procedural is decided once per run, so the look never switches halfway
+      state.textured ??= texturesReady(PORTAL_TEXTURES);
+      const textured = state.textured;
       if (phase === "out") {
         // Open (first 45%), then move towards it until the vortex fills the view
         const open = smooth(0, 0.45, raw);
@@ -446,19 +524,24 @@ export const BUILTIN_TRANSITIONS = [
         const r = m * 0.26 * pop + near * near * (R * 1.15 - m * 0.26);
         drawRot(ctx, A, w, h, { scale: 1 + near * near * 0.8, angle: near * 0.15 });
         fill(ctx, "#0b0218", open * 0.35 + near * 0.4, w, h);
-        drawVortex(ctx, w, h, Math.max(0, r), t, 0);
-        drawRing(ctx, w, h, Math.max(0, r), t, 1 - smooth(0.85, 1, raw), state);
+        if (r > 0.5) {
+          drawVortex(ctx, w, h, r, t, 0, textured);
+          drawRing(ctx, w, h, r, t, 1 - smooth(0.85, 1, raw), state);
+        }
       } else {
-        // The new scene opens out of the vortex centre, the ring rushing past the viewer
+        // The new scene opens out of the vortex centre, the ring rushing past the viewer. The vortex is the size the
+        // "out" phase ended on, so nothing jumps between the phases.
         const r = R * 1.2 * p;
-        drawVortex(ctx, w, h, R * 1.5, t, 0);
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(w / 2, h / 2, Math.max(0.5, r), 0, TAU);
-        ctx.clip();
-        drawRot(ctx, B, w, h, { scale: 1.35 - 0.35 * p, angle: -(1 - p) * 0.5 });
-        ctx.restore();
-        drawRing(ctx, w, h, r, t, 1 - smooth(0.6, 1, p), state, smooth(0.3, 1, p));
+        drawVortex(ctx, w, h, R * 1.15, t, 0, textured);
+        if (r > 0.5) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(w / 2, h / 2, r, 0, TAU);
+          ctx.clip();
+          drawRot(ctx, B, w, h, { scale: 1.35 - 0.35 * p, angle: -(1 - p) * 0.5 });
+          ctx.restore();
+        }
+        drawRing(ctx, w, h, r, t, 1 - smooth(0.6, 1, p), state, smooth(0.3, 1, p), true);
         fill(ctx, "#ffffff", Math.max(0, 1 - Math.abs(p - 0.08) / 0.08) * 0.35, w, h);
       }
     }
@@ -466,7 +549,11 @@ export const BUILTIN_TRANSITIONS = [
 ];
 
 /** The registry: id → definition. */
-export const TRANSITIONS = new Map(BUILTIN_TRANSITIONS.map(d => [d.id, d]));
+/** Which group each transition is listed under in the pickers. */
+for (const def of BUILTIN_TRANSITIONS) def.group ??= def.id.startsWith("stairs") ? "stairs" : def.id === "portal" ? "cinematic" : "classic";
+for (const def of CINEMATIC_TRANSITIONS) def.group ??= "cinematic";
+
+export const TRANSITIONS = new Map([...BUILTIN_TRANSITIONS, ...CINEMATIC_TRANSITIONS].map(d => [d.id, d]));
 
 export function knownIds() {
   return new Set(TRANSITIONS.keys());
@@ -479,7 +566,8 @@ export function registerTransition(id, def) {
   if (!def || typeof def.draw !== "function") throw new Error(`Transition "${key}" needs a draw(ctx, frame) function`);
   const stored = {
     id: key, label: String(def.label ?? key), icon: String(def.icon ?? "fa-solid fa-film"),
-    split: !!def.split, hold: !!def.split && !!def.hold, draw: def.draw
+    split: !!def.split, hold: !!def.split && !!def.hold, draw: def.draw,
+    group: ["classic", "stairs", "cinematic"].includes(def.group) ? def.group : "custom"
   };
   TRANSITIONS.set(key, stored);
   return stored;

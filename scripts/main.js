@@ -6,8 +6,8 @@
  * dialog when activating a scene.
  *
  * API: game.modules.get("dxcufgbs-scene-transitions").api
- *   transitions                    → [{id, label, icon, split}] the registered transitions
- *   register(id, definition)       → adds a transition: {label, icon, split, hold?, draw(ctx, frame)} (see scripts/transitions.js)
+ *   transitions                    → [{id, label, icon, split, hold, group}] the registered transitions
+ *   register(id, definition)       → adds a transition: {label, icon, split, hold?, group?, draw(ctx, frame)} (see scripts/transitions.js)
  *   resolve({from, to, explicit?}) → {binding, source} the binding a change from → to uses on this client
  *   activate(scene, binding?)      → GM: activates a scene for everyone with this binding (no dialog); without a
  *                                    binding each client uses its bound transition; {transition: "none"} for none
@@ -25,11 +25,12 @@
  *   context = {binding, kind ("scene" | "local" | "preview"), from, to, source, stairway?}
  */
 import { MODULE_ID, t, sceneName } from "./util.js";
-import { TRANSITIONS, knownIds, registerTransition } from "./transitions.js";
+import { TRANSITIONS, knownIds, registerTransition, warmTints } from "./transitions.js";
 import { sanitizeBinding, NONE } from "./bindings.js";
 import { patchCanvasDraw, onCanvasReady, bindingFor, setPending, previewOnScreen } from "./player.js";
 import { patchActivate, activateWith, onPreUpdateScene, onUpdateScene } from "./activate.js";
 import { registerStairways } from "./stairways.js";
+import { loadTextures } from "./textures.js";
 import { TransitionManager } from "./apps/manager.js";
 
 let originalActivate = null;
@@ -73,6 +74,7 @@ Hooks.once("init", () => {
 
 Hooks.once("setup", () => {
   registerStairways();
+  loadTextures().then(warmTints);
 });
 
 Hooks.on("canvasReady", onCanvasReady);
@@ -103,7 +105,7 @@ Hooks.once("ready", () => {
   const mod = game.modules.get(MODULE_ID);
   mod.api = {
     get transitions() {
-      return [...TRANSITIONS.values()].map(d => ({ id: d.id, label: game.i18n.localize(d.label), icon: d.icon, split: d.split, hold: !!d.hold }));
+      return [...TRANSITIONS.values()].map(d => ({ id: d.id, label: game.i18n.localize(d.label), icon: d.icon, split: d.split, hold: !!d.hold, group: d.group }));
     },
     register: (id, definition) => registerTransition(id, definition),
     resolve: ({ from, to, explicit = null } = {}) => {

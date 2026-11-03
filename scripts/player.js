@@ -178,7 +178,8 @@ class Run {
     clearTimeout(this.claimTimer);
     this.finish(prepare).catch(err => {
       console.error(`${MODULE_ID} | transition failed`, err);
-      this.remove();
+      // cancel(), not just remove(): it also stops the hold loop and the title timers
+      this.cancel();
     });
   }
 

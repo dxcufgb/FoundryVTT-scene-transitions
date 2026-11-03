@@ -1,7 +1,7 @@
 {
   "id": "dxcufgbs-scene-transitions",
   "title": "Dxcufgb's Scene Transitions",
-  "description": "Cinematic transitions between scenes: fade through black or white, crossfade, iris, wipe, slide, curtain, blur, pixelate, zoom, tiles, dissolve and four stairs up or down transitions, with an optional title card and sound. The GM binds transitions to scene pairs, to scenes and to Stairways stairways (each end its own, also within one scene), sets a world default, and picks a transition in a dialog when activating a scene.",
+  "description": "Cinematic transitions between scenes: fade through black or white, crossfade, iris, wipe, slide, curtain, blur, pixelate, zoom, tiles, dissolve, four stairs up or down transitions, a magic portal, burn away, smoke, shatter, lightning strike, ink wash, frost, page turn, old film, sandstorm and rain on glass, with an optional title card and sound. The GM binds transitions to scene pairs, to scenes and to Stairways stairways (each end its own, also within one scene), sets a world default, and picks a transition in a dialog when activating a scene.",
   "version": "0.1.0",
   "authors": [
     {

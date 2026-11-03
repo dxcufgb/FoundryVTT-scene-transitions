@@ -41,8 +41,18 @@ https://github.com/dxcufgb/FoundryVTT-scene-transitions/releases/latest/download
 | Dissolve | The new scene seeps in through drifting blobs. |
 | Stairs down / Stairs up | The old scene moves up (or down) into darkness and the new one rises from the other side. |
 | Stairs down: pass through | The old scene rushes towards you until it passes your point of view, revealing the new scene below. |
-| Magic portal | A glowing portal with a swirling vortex opens in the scene, you move into it, and the new scene opens out of its centre as the ring rushes past you. The vortex keeps swirling while the new scene loads. |
 | Stairs up: from behind | The new scene comes from behind you, over your head, and settles into view as the old one sinks away. |
+| Magic portal | A glowing portal opens in the scene: a whirlpool of violet and blue light inside, a ring of drifting magic smoke, flickering lightning and sparkles around it. You move into it, and the new scene opens out of its centre as the ring rushes past you. The vortex keeps swirling while the new scene loads. |
+| Burn away | The old scene catches fire at the bottom and burns upward: a ragged glowing edge with flames, scorch marks and rising embers, the new scene showing where it has burnt through. |
+| Smoke | Smoke billows up from the bottom until it fills the view, keeps drifting while the new scene loads, then clears from the middle outward. |
+| Shatter | The old scene cracks like glass and breaks apart from the middle, the shards tumbling away to reveal the new scene. |
+| Lightning strike | The scene darkens as a storm comes in, lightning strikes a few times, and a final strike floods everything with white light that fades onto the new scene. |
+| Ink wash | Blots of the new scene bleed into the old one like ink on wet paper, with dark wet edges, until they meet. |
+| Frost | Frost creeps in from the edges until the view is frozen over; cracks race out from the middle and the ice falls away to reveal the new scene. |
+| Page turn | The old scene is turned like a book page from the bottom-right corner, showing its pale back and a soft shadow, uncovering the new scene. |
+| Old film | The picture turns into an old film reel (sepia, grain, scratches, flicker, a jittering frame) until the frame jams and burns through; the new reel starts overexposed and settles. |
+| Sandstorm | A sandstorm blows in from the side until the view is lost in sand, keeps raging while the new scene loads, then dies down over the new scene. |
+| Rain on glass | Rain runs down the glass in front of the view while the old scene blurs into the new one behind it; each drop shows the scene upside down. |
 
 Each binding also has a **duration**, an optional **title card** (the scene's name, or your own text) and an optional **sound**. The title card shows **before** (from the start, over the scene you leave), **during** (around the middle) or **after** the transition (over the new scene once it's live). Before and during never pause the transition: the text fades in and out while it plays. The sidebar and other UI stay usable during a transition.
 
@@ -96,8 +106,8 @@ With [Stairways](https://foundryvtt.com/packages/stairways) enabled, each end of
 
 | Member | Does |
 |---|---|
-| `transitions` | `[{id, label, icon, split}]`: the registered transitions. |
-| `register(id, definition)` | Adds a transition. `definition = {label, icon, split, hold?, draw(ctx, frame)}`, where `frame = {phase: "out" \| "in", p, raw, A, B, w, h, state, t}` (`t`: ms since the transition started). `A` and `B` are canvases of the old and new scene (`B` only in `"in"`), `p` runs from 0 to 1 eased. `split: true` plays `"out"` while the new scene loads, then `"in"`. `split: false` plays only `"in"` (A → B). `hold: true` (split only) keeps drawing the last `"out"` frame with `t` running while the new scene loads. |
+| `transitions` | `[{id, label, icon, split, hold, group}]`: the registered transitions. |
+| `register(id, definition)` | Adds a transition. `definition = {label, icon, split, hold?, group?, draw(ctx, frame)}`, where `frame = {phase: "out" \| "in", p, raw, A, B, w, h, state, t}` (`t`: ms since the transition started). `A` and `B` are canvases of the old and new scene (`B` only in `"in"`), `p` runs from 0 to 1 eased. `split: true` plays `"out"` while the new scene loads, then `"in"`. `split: false` plays only `"in"` (A → B). `hold: true` (split only) keeps drawing the last `"out"` frame with `t` running while the new scene loads. `group` (`classic`, `stairs`, `cinematic`) picks the heading it's listed under; anything else is listed under "From other modules". |
 | `resolve({from, to, explicit?})` | `{binding, source}`: the binding a change from → to uses on this client (`source` is `explicit`, `pair`, `enter` or `default`). |
 | `activate(scene, binding?)` | GM: activates a scene for everyone with this binding, without the dialog. Without a binding, everyone gets their bound transition. Pass `{transition: "none"}` for none. |
 | `view(scene, binding?)` | Views a scene on this client with this binding (or the bound one). |
@@ -120,6 +130,10 @@ A **binding** is `{transition, duration, title, titleText, titleWhen, sound}`: `
 - `flags.dxcufgbs-scene-transitions.stairways.<stairwayId>`: a Stairways stairway end on this scene.
 
 Adventures exported with these flags keep their transitions when imported (scene ids are kept).
+
+## Credits
+
+The textures of the Magic portal, Burn away, Smoke, Lightning strike and Sandstorm come from Kenney's [Particle Pack](https://kenney.nl/assets/particle-pack) (CC0). See `assets/textures/LICENSE.txt`.
 
 ## Compatibility
 

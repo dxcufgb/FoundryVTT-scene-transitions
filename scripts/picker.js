@@ -9,6 +9,7 @@ import { previewOnScreen } from "./player.js";
  */
 
 const PREVIEW_W = 192;
+const GROUPS = ["classic", "stairs", "cinematic", "custom"];
 const PREVIEW_H = 108;
 
 function label(def) {
@@ -27,8 +28,14 @@ export function pickerHTML(raw, { key = "", inherit = null } = {}) {
   const options = [];
   if (inherit) options.push(`<option value="${INHERIT}"${b.transition === INHERIT ? " selected" : ""}>${escapeHTML(inherit)}</option>`);
   options.push(`<option value="${NONE}"${b.transition === NONE ? " selected" : ""}>${escapeHTML(t("None"))}</option>`);
+  // Grouped: classic, stairs, cinematic, then any added by other modules
+  const groups = new Map(GROUPS.map(g => [g, []]));
   for (const def of TRANSITIONS.values()) {
-    options.push(`<option value="${escapeHTML(def.id)}"${b.transition === def.id ? " selected" : ""}>${escapeHTML(label(def))}</option>`);
+    const g = groups.has(def.group) ? def.group : "custom";
+    groups.get(g).push(`<option value="${escapeHTML(def.id)}"${b.transition === def.id ? " selected" : ""}>${escapeHTML(label(def))}</option>`);
+  }
+  for (const [g, list] of groups) {
+    if (list.length) options.push(`<optgroup label="${escapeHTML(t(`Group.${g}`))}">${list.join("")}</optgroup>`);
   }
   if (!inherit && b.transition === INHERIT) options[0] = options[0].replace("<option", "<option selected");
   const seconds = (b.duration / 1000).toFixed(1).replace(/\.0$/, "");
@@ -199,8 +206,14 @@ export async function playThumb(cv, binding, fromScene, toScene) {
       const raw = fixed ?? (ms ? Math.min(1, (now - start) / ms) : 1);
       ctx.save();
       ctx.clearRect(0, 0, w, h);
-      try { def.draw(ctx, { phase, p: ease(raw), raw, A, B, w, h, state, t: now - t0 }); } catch (err) { console.error(`${MODULE_ID} | preview`, err); return resolve(false); }
-      ctx.restore();
+      try {
+        def.draw(ctx, { phase, p: ease(raw), raw, A, B, w, h, state, t: now - t0 });
+      } catch (err) {
+        console.error(`${MODULE_ID} | preview`, err);
+        return resolve(false);
+      } finally {
+        ctx.restore();
+      }
       if ((fixed === null && raw >= 1) || (fixed !== null && now - start >= ms)) return resolve(true);
       requestAnimationFrame(step);
     };

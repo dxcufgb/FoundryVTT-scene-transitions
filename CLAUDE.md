@@ -12,8 +12,8 @@ System-agnostic. No build step and no npm dependencies. Stairways is optional.
 - `scripts/util.js` – `MODULE_ID`, `t()` (keys under `DXST.`), `escapeHTML`, small helpers.
 - `scripts/bindings.js` – pure logic, no Foundry globals (unit tested in `tests/`): `sanitizeBinding`,
   `resolveBinding` (explicit → pair → enter → world default), `resolveSameScene`, `phaseDurations`, `ease`.
-- `scripts/transitions.js` – the transition definitions `{id, label, icon, split, hold?, draw(ctx, frame)}` and the
-  registry (`TRANSITIONS`, `registerTransition`). They draw on a 2D canvas from snapshot A (old scene) and B (new
+- `scripts/transitions.js` – the transition definitions `{id, label, icon, split, hold?, draw(ctx, frame)}` (plus
+  the cinematic ones from `cinematic.js`) and the registry (`TRANSITIONS`, `registerTransition`). They draw on a 2D canvas from snapshot A (old scene) and B (new
   scene); every size is relative to w/h so the same code draws the full screen and the small previews.
 - `scripts/player.js` – the player. Wraps `foundry.canvas.Canvas.prototype.draw`: before the canvas draws another
   scene it snapshots the old one (render the stage, `drawImage` the WebGL view in the same task), puts it on an
@@ -22,6 +22,17 @@ System-agnostic. No build step and no npm dependencies. Stairways is optional.
   cancels the old. Explicit choices wait in `pending` (one, per target scene, 20 s). Definitions with `hold: true`
   keep drawing the last "out" frame (`t` running) while the new scene loads. Frames get `t` (ms since start).
   `previewOnScreen` plays into the target scene's thumbnail (or a recoloured copy of the view), never A → A.
+- `scripts/fx.js` – drawing helpers shared by the transitions (no Foundry globals): fill/draw/drawRot/sprite, seeded
+  `rng`, `smooth`, `noiseField` (fractal value noise, cached in the run state), `maskCanvas` (a small per-cell
+  alpha/colour canvas, stretched over the frame for soft edges), `maskedLayer` (a picture kept only where a mask is).
+- `scripts/cinematic.js` – Burn away, Smoke, Shatter, Lightning strike, Ink wash; `scripts/cinematic-extra.js` – Frost,
+  Page turn (fold = perpendicular bisector of corner→pulled point, flap drawn under a reflection), Old film, Sandstorm,
+  Rain on glass; added to the registry through `CINEMATIC_TRANSITIONS`. Masks are computed on a small grid
+  (~160 wide) and stretched; only the new-scene reveal is a full-size masked layer.
+- `scripts/textures.js` + `assets/textures/*.webp` – textures for the portal, burn, smoke, lightning and sandstorm (Kenney
+  Particle Pack, CC0, white shapes in alpha), loaded at setup; `tint` makes cached coloured sprites and
+  `warmTints` (transitions.js) tints every pair up front. A transition whose textures aren't loaded when it starts draws a
+  procedural fallback for the whole run (`state.textured`, decided once). The release zip includes `assets` (`.github/foundry-module.json`).
 - `scripts/activate.js` – wraps `Scene#activate` (GM): the Activate dialog (DialogV2), Shift skips it. The choice
   rides in the update options (`preUpdateScene` puts it in `options[MODULE_ID]`, every client's `updateScene` reads
   it), so there is no socket. Payload `{binding}`; `binding: null` means "each client uses its bound transition".
