@@ -206,8 +206,14 @@ export async function playThumb(cv, binding, fromScene, toScene) {
       const raw = fixed ?? (ms ? Math.min(1, (now - start) / ms) : 1);
       ctx.save();
       ctx.clearRect(0, 0, w, h);
-      try { def.draw(ctx, { phase, p: ease(raw), raw, A, B, w, h, state, t: now - t0 }); } catch (err) { console.error(`${MODULE_ID} | preview`, err); return resolve(false); }
-      ctx.restore();
+      try {
+        def.draw(ctx, { phase, p: ease(raw), raw, A, B, w, h, state, t: now - t0 });
+      } catch (err) {
+        console.error(`${MODULE_ID} | preview`, err);
+        return resolve(false);
+      } finally {
+        ctx.restore();
+      }
       if ((fixed === null && raw >= 1) || (fixed !== null && now - start >= ms)) return resolve(true);
       requestAnimationFrame(step);
     };

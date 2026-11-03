@@ -6,7 +6,7 @@
  * dialog when activating a scene.
  *
  * API: game.modules.get("dxcufgbs-scene-transitions").api
- *   transitions                    → [{id, label, icon, split}] the registered transitions
+ *   transitions                    → [{id, label, icon, split, hold, group}] the registered transitions
  *   register(id, definition)       → adds a transition: {label, icon, split, hold?, group?, draw(ctx, frame)} (see scripts/transitions.js)
  *   resolve({from, to, explicit?}) → {binding, source} the binding a change from → to uses on this client
  *   activate(scene, binding?)      → GM: activates a scene for everyone with this binding (no dialog); without a

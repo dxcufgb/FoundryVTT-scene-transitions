@@ -157,8 +157,8 @@ function drawRingTextured(ctx, w, h, r, t, alpha, state, flyOut = 0, outsideOnly
 }
 
 /** The swirling inside of the portal, filling a circle of radius r around the centre. */
-function drawVortex(ctx, w, h, r, t, spin) {
-  if (texturesReady(PORTAL_TEXTURES)) return drawVortexTextured(ctx, w, h, r, t, spin);
+function drawVortex(ctx, w, h, r, t, spin, textured = false) {
+  if (textured) return drawVortexTextured(ctx, w, h, r, t, spin);
   const cx = w / 2, cy = h / 2, m = Math.min(w, h);
   ctx.save();
   ctx.beginPath();
@@ -195,7 +195,7 @@ function drawVortex(ctx, w, h, r, t, spin) {
 
 /** The glowing ring at radius r, with runes and sparks orbiting it. */
 function drawRing(ctx, w, h, r, t, alpha, state, flyOut = 0, outsideOnly = false) {
-  if (texturesReady(PORTAL_TEXTURES)) return drawRingTextured(ctx, w, h, r, t, alpha, state, flyOut, outsideOnly);
+  if (state.textured) return drawRingTextured(ctx, w, h, r, t, alpha, state, flyOut, outsideOnly);
   if (alpha <= 0 || r <= 0.5) return;
   const cx = w / 2, cy = h / 2, m = Math.min(w, h);
   ctx.save();
@@ -256,7 +256,8 @@ export const BUILTIN_TRANSITIONS = [
   {
     id: "iris", label: "DXST.Transition.iris", icon: "fa-regular fa-circle-dot", split: true,
     draw(ctx, { phase, p, A, B, w, h }) {
-      const R = Math.hypot(w, h) / 2;
+      // Just past the corners (the rim's blur too), so the first and last frames are the whole picture
+      const R = Math.hypot(w, h) / 2 + Math.max(4, Math.min(w, h) * 0.04);
       const r = phase === "out" ? (1 - p) * R : p * R;
       fill(ctx, "#000", 1, w, h);
       if (r <= 0.5) return;
@@ -315,12 +316,14 @@ export const BUILTIN_TRANSITIONS = [
   {
     id: "curtain", label: "DXST.Transition.curtain", icon: "fa-solid fa-person-booth", split: false,
     draw(ctx, { p, A, B, w, h }) {
-      const half = w / 2;
+      if (p <= 0) { draw(ctx, A, w, h); return; }
+      const half = Math.round(w / 2);
       const off = p * half;
       draw(ctx, B, w, h);
       fill(ctx, "#000", (1 - p) * 0.5, w, h);
       ctx.save();
-      ctx.shadowColor = "rgba(0,0,0,0.7)";
+      // The shadow fades out with the doors, so none is left on the new scene at the end
+      ctx.shadowColor = `rgba(0,0,0,${(0.7 * (1 - p)).toFixed(3)})`;
       ctx.shadowBlur = Math.min(w, h) * 0.05;
       ctx.drawImage(A, 0, 0, half, h, -off, 0, half, h);
       ctx.drawImage(A, half, 0, w - half, h, half + off, 0, w - half, h);
@@ -332,11 +335,15 @@ export const BUILTIN_TRANSITIONS = [
     draw(ctx, { phase, p, A, B, w, h }) {
       const max = Math.max(w, h) * 0.02;
       const k = phase === "out" ? p : 1 - p;
-      ctx.save();
-      ctx.filter = k > 0.01 ? `blur(${(k * max).toFixed(1)}px)` : "none";
-      // Draw a little oversized so the blurred edges never show the background
-      draw(ctx, phase === "out" ? A : B, w, h, { scale: 1 + k * 0.06 });
-      ctx.restore();
+      const img = phase === "out" ? A : B;
+      // The sharp picture underneath, so the blurred edges never let anything show through
+      draw(ctx, img, w, h, { scale: 1 + k * 0.06 });
+      if (k > 0.01) {
+        ctx.save();
+        ctx.filter = `blur(${(k * max).toFixed(1)}px)`;
+        draw(ctx, img, w, h, { scale: 1 + k * 0.06 });
+        ctx.restore();
+      }
       fill(ctx, "#000", k * 0.55, w, h);
     }
   },
@@ -385,6 +392,7 @@ export const BUILTIN_TRANSITIONS = [
         state.tiles = { cols, rows, order };
       }
       draw(ctx, A, w, h);
+      if (p >= 1) { draw(ctx, B, w, h); return; }
       for (const cell of state.tiles.order) {
         const local = (p - cell.t) / 0.15;
         if (local <= 0) continue;
@@ -395,7 +403,9 @@ export const BUILTIN_TRANSITIONS = [
         ctx.save();
         ctx.globalAlpha = k;
         ctx.beginPath();
-        ctx.rect(sx, sy, s + 0.5, s + 0.5);
+        // A landed cell overlaps its neighbours by a pixel, so no seams of the old scene remain
+        const pad = k >= 1 ? 1 : 0.5;
+        ctx.rect(Math.floor(sx) - (k >= 1 ? 1 : 0), Math.floor(sy) - (k >= 1 ? 1 : 0), Math.ceil(s) + pad + (k >= 1 ? 1 : 0), Math.ceil(s) + pad + (k >= 1 ? 1 : 0));
         ctx.clip();
         ctx.drawImage(B, 0, 0, w, h);
         ctx.restore();
@@ -503,6 +513,9 @@ export const BUILTIN_TRANSITIONS = [
     draw(ctx, { phase, p, raw, A, B, w, h, state, t = 0 }) {
       const R = Math.hypot(w, h) / 2;
       const m = Math.min(w, h);
+      // Textured or procedural is decided once per run, so the look never switches halfway
+      state.textured ??= texturesReady(PORTAL_TEXTURES);
+      const textured = state.textured;
       if (phase === "out") {
         // Open (first 45%), then move towards it until the vortex fills the view
         const open = smooth(0, 0.45, raw);
@@ -511,18 +524,23 @@ export const BUILTIN_TRANSITIONS = [
         const r = m * 0.26 * pop + near * near * (R * 1.15 - m * 0.26);
         drawRot(ctx, A, w, h, { scale: 1 + near * near * 0.8, angle: near * 0.15 });
         fill(ctx, "#0b0218", open * 0.35 + near * 0.4, w, h);
-        drawVortex(ctx, w, h, Math.max(0, r), t, 0);
-        drawRing(ctx, w, h, Math.max(0, r), t, 1 - smooth(0.85, 1, raw), state);
+        if (r > 0.5) {
+          drawVortex(ctx, w, h, r, t, 0, textured);
+          drawRing(ctx, w, h, r, t, 1 - smooth(0.85, 1, raw), state);
+        }
       } else {
-        // The new scene opens out of the vortex centre, the ring rushing past the viewer
+        // The new scene opens out of the vortex centre, the ring rushing past the viewer. The vortex is the size the
+        // "out" phase ended on, so nothing jumps between the phases.
         const r = R * 1.2 * p;
-        drawVortex(ctx, w, h, R * 1.5, t, 0);
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(w / 2, h / 2, Math.max(0.5, r), 0, TAU);
-        ctx.clip();
-        drawRot(ctx, B, w, h, { scale: 1.35 - 0.35 * p, angle: -(1 - p) * 0.5 });
-        ctx.restore();
+        drawVortex(ctx, w, h, R * 1.15, t, 0, textured);
+        if (r > 0.5) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(w / 2, h / 2, r, 0, TAU);
+          ctx.clip();
+          drawRot(ctx, B, w, h, { scale: 1.35 - 0.35 * p, angle: -(1 - p) * 0.5 });
+          ctx.restore();
+        }
         drawRing(ctx, w, h, r, t, 1 - smooth(0.6, 1, p), state, smooth(0.3, 1, p), true);
         fill(ctx, "#ffffff", Math.max(0, 1 - Math.abs(p - 0.08) / 0.08) * 0.35, w, h);
       }

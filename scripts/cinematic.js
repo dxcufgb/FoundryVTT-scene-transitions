@@ -56,7 +56,8 @@ function drawBurn(ctx, { raw, A, B, w, h, state, t = 0 }) {
   stretch(ctx, glow, w, h, 0.5);
   ctx.restore();
 
-  if (raw >= 0.995 || !texturesReady(BURN_TEXTURES)) return;
+  state.textured ??= texturesReady(BURN_TEXTURES);
+  if (raw >= 0.995 || !state.textured) return;
   // Where the front is in each column (the topmost burnt cell)
   const frontAt = gx => {
     for (let y = 0; y < nh; y++) if (v[y * nw + gx] < L) return (y / (nh - 1)) * h;
@@ -143,7 +144,7 @@ function puff(ctx, p, x, y, size, angle, alpha, textured) {
 }
 
 function drawSmoke(ctx, { phase, raw, A, B, w, h, state, t = 0 }) {
-  const textured = texturesReady(SMOKE_TEXTURES);
+  const textured = (state.textured ??= texturesReady(SMOKE_TEXTURES));
   const m = Math.max(w, h);
   const puffs = smokePuffs(state);
   if (phase === "out") {
@@ -225,38 +226,56 @@ function drawShatter(ctx, { raw, A, B, w, h, state }) {
   const m = Math.min(w, h);
   draw(ctx, B, w, h);
   fill(ctx, "#000", (1 - raw) * 0.35, w, h);
-  const cracks = 1 - smooth(0.05, 0.3, raw);
+  // The cracks appear in the first moments, so the very first frame is still the whole picture
+  const cracks = smooth(0, 0.03, raw) * (1 - smooth(0.05, 0.3, raw));
+  // Unbroken glass is drawn in one go (one clip of all its shards), so no seams show between them
+  ctx.save();
+  ctx.beginPath();
+  for (const s of list) {
+    if (raw > s.delay) continue;
+    ctx.moveTo(s.poly[0][0], s.poly[0][1]);
+    ctx.lineTo(s.poly[1][0], s.poly[1][1]);
+    ctx.lineTo(s.poly[2][0], s.poly[2][1]);
+    ctx.closePath();
+  }
+  ctx.clip();
+  ctx.drawImage(A, 0, 0, w, h);
+  ctx.restore();
   for (const s of list) {
     const k = Math.min(1, Math.max(0, (raw - s.delay) / 0.55));
     if (k >= 1) continue;
-    ctx.save();
-    if (k > 0) {
-      const dx = s.vx * k * w * 0.7;
-      const dy = (s.vy * k + 1.7 * k * k) * h;
-      const scale = 1 - 0.3 * k;
-      ctx.translate(s.cx + dx, s.cy + dy);
-      ctx.rotate(s.spin * k);
-      ctx.scale(scale, scale);
-      ctx.translate(-s.cx, -s.cy);
-      ctx.globalAlpha = 1 - smooth(0.55, 1, k);
+    if (k <= 0) {
+      if (cracks > 0.01) {
+        shardPath(ctx, s.poly);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${cracks * 0.35})`;
+        ctx.lineWidth = Math.max(1, m * 0.002);
+        ctx.stroke();
+      }
+      continue;
     }
+    ctx.save();
+    const dx = s.vx * k * w * 0.7;
+    const dy = (s.vy * k + 1.7 * k * k) * h;
+    const scale = 1 - 0.3 * k;
+    ctx.translate(s.cx + dx, s.cy + dy);
+    ctx.rotate(s.spin * k);
+    ctx.scale(scale, scale);
+    ctx.translate(-s.cx, -s.cy);
+    ctx.globalAlpha = 1 - smooth(0.55, 1, k);
     shardPath(ctx, s.poly);
     ctx.save();
     ctx.clip();
     ctx.drawImage(A, 0, 0, w, h);
     // A glint on the glass while it tumbles
-    if (k > 0) fill(ctx, "#ffffff", Math.abs(Math.sin(s.spin * k * 2)) * 0.18, w, h);
+    fill(ctx, "#ffffff", Math.abs(Math.sin(s.spin * k * 2)) * 0.18, w, h);
     ctx.restore();
-    const edgeAlpha = k > 0 ? 0.45 : cracks * 0.35;
-    if (edgeAlpha > 0.01) {
-      ctx.strokeStyle = `rgba(255, 255, 255, ${edgeAlpha})`;
-      ctx.lineWidth = Math.max(1, m * 0.002);
-      ctx.stroke();
-    }
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+    ctx.lineWidth = Math.max(1, m * 0.002);
+    ctx.stroke();
     ctx.restore();
   }
-  // The flash of the impact
-  fill(ctx, "#ffffff", Math.max(0, 1 - raw / 0.06) * 0.5, w, h);
+  // The flash of the impact, rising and falling in the first moments
+  fill(ctx, "#ffffff", Math.sin(Math.PI * Math.min(1, raw / 0.08)) * 0.5, w, h);
 }
 
 /* ---------------------------------------- */
@@ -306,8 +325,8 @@ function bolt(ctx, s, w, h, alpha, textured) {
   ctx.restore();
 }
 
-function drawLightning(ctx, { phase, p, raw, A, B, w, h }) {
-  const textured = texturesReady(BOLT_TEXTURES);
+function drawLightning(ctx, { phase, p, raw, A, B, w, h, state }) {
+  const textured = (state.textured ??= texturesReady(BOLT_TEXTURES));
   if (phase === "out") {
     draw(ctx, A, w, h);
     fill(ctx, "#050a1c", 0.6 * smooth(0, 0.3, raw), w, h);

@@ -1,5 +1,5 @@
 /**
- * Textures for the textured transitions (Magic portal, Burn away, Smoke, Lightning strike): white shapes in the alpha
+ * Textures for the textured transitions (Magic portal, Burn away, Smoke, Lightning strike, Sandstorm): white shapes in the alpha
  * channel from Kenney's Particle Pack (CC0, see assets/textures/LICENSE.txt), tinted here into coloured sprites.
  * They load in the background when the module starts; a transition whose textures aren't ready (or failed) draws a
  * plainer procedural look instead.

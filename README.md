@@ -41,6 +41,7 @@ https://github.com/dxcufgb/FoundryVTT-scene-transitions/releases/latest/download
 | Dissolve | The new scene seeps in through drifting blobs. |
 | Stairs down / Stairs up | The old scene moves up (or down) into darkness and the new one rises from the other side. |
 | Stairs down: pass through | The old scene rushes towards you until it passes your point of view, revealing the new scene below. |
+| Stairs up: from behind | The new scene comes from behind you, over your head, and settles into view as the old one sinks away. |
 | Magic portal | A glowing portal opens in the scene: a whirlpool of violet and blue light inside, a ring of drifting magic smoke, flickering lightning and sparkles around it. You move into it, and the new scene opens out of its centre as the ring rushes past you. The vortex keeps swirling while the new scene loads. |
 | Burn away | The old scene catches fire at the bottom and burns upward: a ragged glowing edge with flames, scorch marks and rising embers, the new scene showing where it has burnt through. |
 | Smoke | Smoke billows up from the bottom until it fills the view, keeps drifting while the new scene loads, then clears from the middle outward. |
@@ -52,7 +53,6 @@ https://github.com/dxcufgb/FoundryVTT-scene-transitions/releases/latest/download
 | Old film | The picture turns into an old film reel (sepia, grain, scratches, flicker, a jittering frame) until the frame jams and burns through; the new reel starts overexposed and settles. |
 | Sandstorm | A sandstorm blows in from the side until the view is lost in sand, keeps raging while the new scene loads, then dies down over the new scene. |
 | Rain on glass | Rain runs down the glass in front of the view while the old scene blurs into the new one behind it; each drop shows the scene upside down. |
-| Stairs up: from behind | The new scene comes from behind you, over your head, and settles into view as the old one sinks away. |
 
 Each binding also has a **duration**, an optional **title card** (the scene's name, or your own text) and an optional **sound**. The title card shows **before** (from the start, over the scene you leave), **during** (around the middle) or **after** the transition (over the new scene once it's live). Before and during never pause the transition: the text fades in and out while it plays. The sidebar and other UI stay usable during a transition.
 
@@ -133,7 +133,7 @@ Adventures exported with these flags keep their transitions when imported (scene
 
 ## Credits
 
-The textures of the Magic portal, Burn away, Smoke and Lightning strike come from Kenney's [Particle Pack](https://kenney.nl/assets/particle-pack) (CC0). See `assets/textures/LICENSE.txt`.
+The textures of the Magic portal, Burn away, Smoke, Lightning strike and Sandstorm come from Kenney's [Particle Pack](https://kenney.nl/assets/particle-pack) (CC0). See `assets/textures/LICENSE.txt`.
 
 ## Compatibility
 

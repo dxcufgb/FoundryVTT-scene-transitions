@@ -250,7 +250,9 @@ function oldFilm(ctx, img, w, h, amount, t, state, jitter = 0) {
   const flicker = 1 + (r() - 0.5) * 0.18 * amount;
   ctx.save();
   ctx.filter = `sepia(${(0.85 * amount).toFixed(2)}) contrast(${(1 + 0.15 * amount).toFixed(2)}) brightness(${flicker.toFixed(2)})`;
-  ctx.drawImage(img, 0, (r() - 0.5) * h * 0.012 * jitter, w, h);
+  // Slightly oversized, so the jittering frame never uncovers an edge
+  const over = 1 + 0.015 * Math.min(1, jitter);
+  ctx.drawImage(img, (w - w * over) / 2, (h - h * over) / 2 + (r() - 0.5) * h * 0.012 * jitter, w * over, h * over);
   ctx.restore();
   if (amount <= 0.01) return;
   const m = Math.min(w, h);
@@ -301,12 +303,15 @@ function drawFilm(ctx, { phase, raw, A, B, w, h, state, t = 0 }) {
     const n = noiseField(state, "filmNoise", nw, nh, 1927, 4);
     const aspect = w / h;
     const hx = 0.58, hy = 0.42;
-    const L = burn * 1.25;
+    // Far enough to reach the farthest corner at any aspect ratio (wide screens included)
+    const reach = Math.hypot(Math.max(hx, 1 - hx) * aspect, Math.max(hy, 1 - hy)) * 0.8 + 0.35 + 0.05;
+    const L = burn * reach;
     const dist = i => {
       const x = (i % nw) / (nw - 1), y = Math.floor(i / nw) / (nh - 1);
       return Math.hypot((x - hx) * aspect, y - hy) * 0.8 + n[i] * 0.35;
     };
-    const hole = maskCanvas(state, "filmHole", nw, nh, i => (L - dist(i)) / 0.04, [255, 250, 235]);
+    // The same cream as the start of the "in" phase (#fffaf0), so the phases meet without a seam
+    const hole = maskCanvas(state, "filmHole", nw, nh, i => (L - dist(i)) / 0.04, [255, 250, 240]);
     const rim = maskCanvas(state, "filmRim", nw, nh, i => 1 - Math.abs(dist(i) - L - 0.04) / 0.06, [255, 140, 40]);
     const scorch = maskCanvas(state, "filmScorch", nw, nh, i => 1 - (dist(i) - L - 0.06) / 0.12, [60, 25, 5]);
     stretch(ctx, scorch, w, h, 0.8);
@@ -351,7 +356,8 @@ function drawSandstorm(ctx, { phase, raw, A, B, w, h, state, t = 0 }) {
   fill(ctx, SAND, Math.min(1, storm * 1.05), w, h);
   const m = Math.max(w, h);
   // Big gusts of dust
-  if (texturesReady(["smoke_04", "smoke_07", "smoke_08"])) {
+  state.textured ??= texturesReady(["smoke_04", "smoke_07", "smoke_08"]);
+  if (state.textured) {
     for (const g of sandGusts(state)) {
       const x = ((g.x + t * 0.00025 * g.speed) % 1.4 - 0.2) * w;
       sprite(ctx, tint(g.tex, "#d9b77f"), x, g.y * h, g.size * m * 0.6, g.rot + t * 0.0002, storm * 0.55);
@@ -418,10 +424,19 @@ function drawRain(ctx, { p, raw, A, B, w, h, state, t = 0 }) {
   bx.save();
   bx.clearRect(0, 0, w, h);
   const blur = wet * m * 0.006;
-  bx.filter = blur > 0.5 ? `blur(${blur.toFixed(1)}px)` : "none";
-  bx.drawImage(A, 0, 0, w, h);
-  bx.globalAlpha = smooth(0.25, 0.75, raw);
-  bx.drawImage(B, 0, 0, w, h);
+  const mix = smooth(0.25, 0.75, raw);
+  const paint = () => {
+    bx.globalAlpha = 1;
+    bx.drawImage(A, 0, 0, w, h);
+    bx.globalAlpha = mix;
+    bx.drawImage(B, 0, 0, w, h);
+  };
+  // Sharp first, then the blurred copy on top: a blur alone goes see-through at the edges
+  paint();
+  if (blur > 0.5) {
+    bx.filter = `blur(${blur.toFixed(1)}px)`;
+    paint();
+  }
   bx.restore();
   ctx.drawImage(bg, 0, 0);
   fill(ctx, "#2a3646", wet * 0.3, w, h);
