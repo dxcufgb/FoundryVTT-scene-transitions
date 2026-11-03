@@ -14,50 +14,9 @@
  * Other modules can add their own with api.register(id, definition).
  */
 
-import { tint, portalTexturesReady, RING_RADIUS } from "./portal-textures.js";
-
-const TAU = Math.PI * 2;
-
-function fill(ctx, color, alpha, w, h) {
-  if (alpha <= 0) return;
-  ctx.save();
-  ctx.globalAlpha = Math.min(1, alpha);
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, w, h);
-  ctx.restore();
-}
-
-function draw(ctx, img, w, h, { x = 0, y = 0, scale = 1, alpha = 1 } = {}) {
-  if (!img) return;
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  const sw = w * scale, sh = h * scale;
-  ctx.drawImage(img, x + (w - sw) / 2, y + (h - sh) / 2, sw, sh);
-  ctx.restore();
-}
-
-function scratch(state, key, w, h) {
-  let c = state[key];
-  if (!c) {
-    c = state[key] = document.createElement("canvas");
-  }
-  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-  return c;
-}
-
-/** Seeded pseudo-random numbers, so a preview and the real thing can share a layout. */
-function rng(seed) {
-  let s = seed >>> 0 || 1;
-  return () => {
-    s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
-    return ((s >>> 0) % 100000) / 100000;
-  };
-}
-
-function smooth(edge0, edge1, x) {
-  const k = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
-  return k * k * (3 - 2 * k);
-}
+import { tint, texturesReady } from "./textures.js";
+import { TAU, fill, draw, drawRot, scratch, rng, smooth, sprite } from "./fx.js";
+import { CINEMATIC_TRANSITIONS, CINEMATIC_TINTS } from "./cinematic.js";
 
 function throughColor(color) {
   return (ctx, f) => {
@@ -70,20 +29,6 @@ function throughColor(color) {
 
 /* Magic portal helpers */
 
-function drawRot(ctx, img, w, h, { scale = 1, angle = 0, alpha = 1 } = {}) {
-  if (!img) return;
-  // Never smaller than what still covers the view at this angle, so no corner shows
-  const cover = Math.abs(Math.cos(angle)) + Math.max(w / h, h / w) * Math.abs(Math.sin(angle));
-  scale = Math.max(scale, cover);
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate(angle);
-  ctx.scale(scale, scale);
-  ctx.drawImage(img, -w / 2, -h / 2, w, h);
-  ctx.restore();
-}
-
 /** Particles that orbit and fly off the portal ring, laid out once per run. */
 function portalSparks(state) {
   if (!state.sparks) {
@@ -95,17 +40,6 @@ function portalSparks(state) {
   return state.sparks;
 }
 
-
-/** Draws a (tinted) square texture centred at (x, y), size px wide, turned by angle. */
-function sprite(ctx, tex, x, y, size, angle = 0, alpha = 1) {
-  if (!tex || size <= 0.5 || alpha <= 0) return;
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.translate(x, y);
-  if (angle) ctx.rotate(angle);
-  ctx.drawImage(tex, -size / 2, -size / 2, size, size);
-  ctx.restore();
-}
 
 /**
  * Spiral arms: each arm is a run of twirl sprites that get smaller and turn further towards the centre, so together
@@ -148,6 +82,10 @@ function drawVortexTextured(ctx, w, h, r, t, spin) {
   ctx.restore();
 }
 
+/** The textures the portal needs, and where each ring texture's ring sits (fraction of half its width). */
+const PORTAL_TEXTURES = ["twirl_01", "twirl_02", "twirl_03", "smoke_10", "light_03", "magic_02", "spark_02", "star_07", "circle_05"];
+const RING_RADIUS = { light_03: 0.72, smoke_10: 0.46, magic_02: 0.48 };
+
 /** Every texture/colour pair the portal uses, tinted up front so the first frame doesn't stall. */
 const PORTAL_TINTS = [
   ["twirl_03", "#8a3dff"], ["twirl_01", "#d070ff"], ["twirl_02", "#55d6ff"], ["circle_05", "#f0dcff"],
@@ -155,8 +93,9 @@ const PORTAL_TINTS = [
   ["magic_02", "#c9a6ff"], ["spark_02", "#bfefff"], ["star_07", "#ffe9ff"], ["star_07", "#9fe8ff"]
 ];
 
-export function warmPortalTints() {
-  for (const [name, color] of PORTAL_TINTS) tint(name, color);
+/** Tints every texture/colour pair the built-in transitions use, once the textures have loaded. */
+export function warmTints() {
+  for (const [name, color] of [...PORTAL_TINTS, ...CINEMATIC_TINTS]) tint(name, color);
 }
 
 function ringSize(name, r) {
@@ -219,7 +158,7 @@ function drawRingTextured(ctx, w, h, r, t, alpha, state, flyOut = 0, outsideOnly
 
 /** The swirling inside of the portal, filling a circle of radius r around the centre. */
 function drawVortex(ctx, w, h, r, t, spin) {
-  if (portalTexturesReady()) return drawVortexTextured(ctx, w, h, r, t, spin);
+  if (texturesReady(PORTAL_TEXTURES)) return drawVortexTextured(ctx, w, h, r, t, spin);
   const cx = w / 2, cy = h / 2, m = Math.min(w, h);
   ctx.save();
   ctx.beginPath();
@@ -256,7 +195,7 @@ function drawVortex(ctx, w, h, r, t, spin) {
 
 /** The glowing ring at radius r, with runes and sparks orbiting it. */
 function drawRing(ctx, w, h, r, t, alpha, state, flyOut = 0, outsideOnly = false) {
-  if (portalTexturesReady()) return drawRingTextured(ctx, w, h, r, t, alpha, state, flyOut, outsideOnly);
+  if (texturesReady(PORTAL_TEXTURES)) return drawRingTextured(ctx, w, h, r, t, alpha, state, flyOut, outsideOnly);
   if (alpha <= 0 || r <= 0.5) return;
   const cx = w / 2, cy = h / 2, m = Math.min(w, h);
   ctx.save();
@@ -592,7 +531,7 @@ export const BUILTIN_TRANSITIONS = [
 ];
 
 /** The registry: id → definition. */
-export const TRANSITIONS = new Map(BUILTIN_TRANSITIONS.map(d => [d.id, d]));
+export const TRANSITIONS = new Map([...BUILTIN_TRANSITIONS, ...CINEMATIC_TRANSITIONS].map(d => [d.id, d]));
 
 export function knownIds() {
   return new Set(TRANSITIONS.keys());
