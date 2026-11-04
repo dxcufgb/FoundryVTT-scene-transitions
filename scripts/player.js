@@ -14,6 +14,10 @@ const SCENE_TIMEOUT = 30000;   // ms to wait for the new scene before giving up
 const LOCAL_TIMEOUT = 3000;    // ms to wait for a same-scene teleport
 const PENDING_TTL = 20000;     // ms an explicit choice waits for its scene change
 const CLAIM_TIMEOUT = 5000;    // ms a run started ahead of a scene change (stairways) waits for that change
+const WATCHDOG_SLACK = 10000;  // ms past a run's longest possible length before its overlay is removed regardless
+// The overlay is drawn at most this many pixels (4K). A HiDPI 4K screen would otherwise need canvases of ~130 MB
+// each, which can run the GPU out of memory: the WebGL context is lost and the view goes blank (white).
+const MAX_PIXELS = 3840 * 2160;
 
 /** An explicit choice for the next change to a scene: {sceneId, binding|null, snapshot|null, ts}. */
 let pending = null;
@@ -37,22 +41,59 @@ export function clientEnabled() {
   try { return game.settings.get(MODULE_ID, "enabled") !== false; } catch { return true; }
 }
 
+/** The size the overlay draws at for a view of w × h pixels: the same, or scaled down to MAX_PIXELS. */
+export function overlaySize(w, h) {
+  const k = Math.min(1, Math.sqrt(MAX_PIXELS / Math.max(1, w * h)));
+  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) };
+}
+
+function contextLost(app) {
+  try { return !!(app?.renderer?.context?.isLost || app?.renderer?.gl?.isContextLost?.()); } catch { return false; }
+}
+
+/** True when a picture came out fully transparent (the browser handed back an empty WebGL buffer). */
+function isEmpty(c) {
+  try {
+    const probe = document.createElement("canvas");
+    probe.width = probe.height = 8;
+    const x = probe.getContext("2d", { willReadFrequently: true });
+    x.drawImage(c, 0, 0, 8, 8);
+    const d = x.getImageData(0, 0, 8, 8).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] !== 0) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** A 2D copy of what the canvas shows right now, or null. */
 export function snapshotCanvas() {
   const app = canvas?.app;
   const view = app?.view;
-  if (!view || !view.width || !view.height || !canvas.ready) return null;
+  if (!view || !view.width || !view.height || !canvas.ready || contextLost(app)) return null;
   try {
     app.renderer.render(app.stage);
+    const { w, h } = overlaySize(view.width, view.height);
     const c = document.createElement("canvas");
-    c.width = view.width;
-    c.height = view.height;
-    c.getContext("2d").drawImage(view, 0, 0);
+    c.width = w;
+    c.height = h;
+    const x = c.getContext("2d");
+    if (!x) throw new Error(`no 2D context for a ${w}×${h} canvas`);
+    x.drawImage(view, 0, 0, w, h);
+    if (isEmpty(c)) {
+      console.warn(`${MODULE_ID} | snapshot came out empty (the browser did not hand back the WebGL picture)`);
+      return null;
+    }
     return c;
   } catch (err) {
     console.warn(`${MODULE_ID} | snapshot failed`, err);
     return null;
   }
+}
+
+/** Frees a canvas's pixels now instead of whenever it is garbage collected. */
+function release(c) {
+  if (c instanceof HTMLCanvasElement) { c.width = 0; c.height = 0; }
 }
 
 function blank(w, h) {
@@ -102,8 +143,9 @@ class Run {
     this.cancelled = false;
     this.arrived = false;
     const view = canvas.app?.view;
-    this.w = A?.width || view?.width || window.innerWidth;
-    this.h = A?.height || view?.height || window.innerHeight;
+    const size = overlaySize(view?.width || window.innerWidth, view?.height || window.innerHeight);
+    this.w = A?.width || size.w;
+    this.h = A?.height || size.h;
     this.A = A ?? blank(this.w, this.h);
     this.durations = phaseDurations(binding.duration, def.split);
   }
@@ -140,6 +182,18 @@ class Run {
     this.timer = setTimeout(() => this.arrive(), timeout);
     // Started ahead of a scene change (a stairway): if the change doesn't come, play back into the current view
     if (this.claimFor) this.claimTimer = setTimeout(() => this.arrive(), CLAIM_TIMEOUT);
+    // Whatever goes wrong, the overlay never stays up past the longest a run can take
+    const longest = timeout + CLAIM_TIMEOUT + this.durations.out + this.durations.in + TITLE_HOLD + TITLE_FADE;
+    this.watchdog = setTimeout(() => {
+      console.warn(`${MODULE_ID} | the transition did not finish in time, removing it`);
+      this.cancel();
+    }, longest + WATCHDOG_SLACK);
+    // The game canvas lost its WebGL context (GPU reset or out of memory): get out of the way
+    this.onContextLost = () => {
+      console.warn(`${MODULE_ID} | the canvas lost its WebGL context, stopping the transition`);
+      this.cancel();
+    };
+    canvas.app?.view?.addEventListener?.("webglcontextlost", this.onContextLost);
     if (this.kind === "preview") this.arrive();
   }
 
@@ -227,7 +281,13 @@ class Run {
   remove() {
     if (this.removed) return;
     this.removed = true;
+    this.cancelled = true;
+    clearTimeout(this.watchdog);
+    clearTimeout(this.timer);
+    clearTimeout(this.claimTimer);
+    canvas.app?.view?.removeEventListener?.("webglcontextlost", this.onContextLost);
     this.el?.remove();
+    for (const c of [this.cv, this.A, this.B, this.previewB, ...Object.values(this.state)]) release(c);
     if (current === this) current = null;
     Hooks.callAll("dxcufgbsSceneTransitionEnd", this.context);
   }
@@ -252,7 +312,13 @@ export function startRun(binding, { A = null, kind = "scene", title = "", contex
   current?.cancel();
   const run = new Run(finalDef, ctx.binding ?? binding, A ?? snapshotCanvas(), { kind, title, context: ctx, claimFor, previewB });
   current = run;
-  run.start();
+  try {
+    run.start();
+  } catch (err) {
+    console.error(`${MODULE_ID} | could not start the transition`, err);
+    run.cancel();
+    return null;
+  }
   return run;
 }
 
@@ -279,6 +345,8 @@ function titleFor(binding, scene) {
 /** Called right before the canvas draws a scene. Starts a transition when the view changes to another scene. */
 function beforeDraw(cnv, scene) {
   const from = cnv.scene;
+  // draw(null) clears the canvas: there is no scene to go to
+  if (scene === null) return;
   const to = scene ?? game.scenes.current;
   if (!from || !to || from.id === to.id || !cnv.ready || cnv.loading) return;
   // A run already started for this change (a stairway) carries on

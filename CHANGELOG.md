@@ -16,6 +16,9 @@
   - **Rain on glass**: rain runs down the glass while the old scene blurs into the new one behind it.
 - The transition dropdowns are grouped under Classic, Stairs and Cinematic (and "From other modules").
 - **Play on screen** now plays from your view into the other scene's thumbnail (or a recoloured copy of your view when there is none). Before, it played from your view into the same picture, so one-step transitions such as Wipe and Crossfade looked like they did nothing.
+- Fix: a transition could leave the screen covered (reported as a white screen). The overlay now always goes away: it is removed if the game canvas loses its WebGL context, if starting the transition fails, and in any case once the transition has run longer than it possibly could.
+- The overlay draws at most at 4K resolution, so HiDPI and very large screens don't run the graphics card out of memory. Its pictures are freed as soon as a transition ends.
+- A snapshot of the scene that comes out empty is logged in the console and replaced with black. Clearing the canvas (no scene to go to) no longer starts a transition.
 - API: transitions get `frame.t` (ms since the start) and can set `hold: true` to keep moving while the new scene loads; `preview(binding, toScene)`.
 
 ## 0.1.0
