@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.2.0
+## 0.1.2
+
+- Fix: a transition could leave the screen covered (reported as a white screen). The overlay now always goes away: it is removed if the game canvas loses its WebGL context, if starting the transition fails, and in any case once the transition has run longer than it possibly could.
+- The overlay draws at most at 4K resolution, so HiDPI and very large screens don't run the graphics card out of memory. Its pictures are freed as soon as a transition ends.
+- A snapshot of the scene that comes out empty is logged in the console and replaced with black. Clearing the canvas (no scene to go to) no longer starts a transition, and stops one that is playing.
+
+## 0.1.1
 
 - New transition **Magic portal**: a glowing portal opens in the scene, with a whirlpool of violet and blue light inside it and drifting magic smoke, flickering lightning, rune circles and sparkles around the ring (textures from Kenney's Particle Pack, CC0). The portal opens, you move into it, and the new scene opens out of its centre as the ring and its sparks rush past you. The vortex keeps swirling while the new scene loads.
 - Ten new cinematic transitions:
