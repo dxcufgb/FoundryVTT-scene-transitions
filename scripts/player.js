@@ -345,8 +345,11 @@ function titleFor(binding, scene) {
 /** Called right before the canvas draws a scene. Starts a transition when the view changes to another scene. */
 function beforeDraw(cnv, scene) {
   const from = cnv.scene;
-  // draw(null) clears the canvas: there is no scene to go to
-  if (scene === null) return;
+  // draw(null) clears the canvas: there is no scene to go to, and a transition still playing has nothing to land on
+  if (scene === null) {
+    current?.cancel();
+    return;
+  }
   const to = scene ?? game.scenes.current;
   if (!from || !to || from.id === to.id || !cnv.ready || cnv.loading) return;
   // A run already started for this change (a stairway) carries on
