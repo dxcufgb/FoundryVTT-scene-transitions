@@ -24,16 +24,81 @@
  *   dxcufgbsSceneTransitionStart(context) / dxcufgbsSceneTransitionEnd(context)
  *   context = {binding, kind ("scene" | "local" | "preview"), from, to, source, stairway?}
  */
-import { MODULE_ID, t, sceneName } from "./util.js";
+import { MODULE_ID, t, sceneName, isResponsibleGM, stairwaysActive } from "./util.js";
 import { TRANSITIONS, knownIds, registerTransition, warmTints } from "./transitions.js";
 import { sanitizeBinding, NONE } from "./bindings.js";
-import { patchCanvasDraw, onCanvasReady, bindingFor, setPending, previewOnScreen } from "./player.js";
-import { patchActivate, activateWith, onPreUpdateScene, onUpdateScene } from "./activate.js";
-import { registerStairways } from "./stairways.js";
-import { loadTextures } from "./textures.js";
-import { TransitionManager } from "./apps/manager.js";
+import { patchCanvasDraw, onCanvasReady, bindingFor, setPending, previewOnScreen, playerDebugState } from "./player.js";
+import { patchActivate, activateWith, onPreUpdateScene, onUpdateScene, activateDebugState } from "./activate.js";
+import { registerStairways, stairwaysDebugState } from "./stairways.js";
+import { loadTextures, textureStats } from "./textures.js";
+import { TransitionManager, stairwaysOn } from "./apps/manager.js";
+import { registerDebugRecorder, issueSummary, transitionKey } from "./debug-recorder.js";
 
 let originalActivate = null;
+let canvasDrawPatched = false;
+let activatePatched = false;
+
+/**
+ * Runtime state for Dxcufgb's Debug Recorder (optional, see scripts/debug-recorder.js). Counts, booleans and this
+ * module's own ids only: no scene, stairway or user names, no title texts, no sound paths.
+ */
+function debugSnapshot() {
+  const known = knownIds();
+  const defs = [...TRANSITIONS.values()];
+  const byGroup = {};
+  for (const d of defs) byGroup[d.group ?? "custom"] = (byGroup[d.group ?? "custom"] ?? 0) + 1;
+
+  const bindings = { scenesWithEnter: 0, scenesWithAny: 0, pair: 0, stairway: 0, stairwaySameScene: 0, withTitle: 0, withSound: 0, unknownTransition: 0, orphanPair: 0 };
+  const byTransition = {};
+  const count = raw => {
+    if (!raw || typeof raw !== "object") return;
+    const id = typeof raw.transition === "string" ? raw.transition.trim() : "";
+    if (id && id !== NONE && !known.has(id)) bindings.unknownTransition++;
+    const b = sanitizeBinding(raw, known);
+    const key = transitionKey(b.transition);
+    byTransition[key] = (byTransition[key] ?? 0) + 1;
+    if (b.title) bindings.withTitle++;
+    if (b.sound) bindings.withSound++;
+  };
+  let stairwaysPlaced = 0;
+  for (const scene of game.scenes ?? []) {
+    const flags = scene.flags?.[MODULE_ID];
+    if (stairwaysActive()) stairwaysPlaced += stairwaysOn(scene).length;
+    if (!flags || typeof flags !== "object") continue;
+    let any = false;
+    if (flags.enter) { bindings.scenesWithEnter++; count(flags.enter); any = true; }
+    for (const [fromId, raw] of Object.entries(flags.from ?? {})) {
+      bindings.pair++;
+      if (!game.scenes.has(fromId)) bindings.orphanPair++;
+      count(raw);
+      any = true;
+    }
+    const placed = new Map(stairwaysOn(scene).map(s => [s._id, s]));
+    for (const [stairId, raw] of Object.entries(flags.stairways ?? {})) {
+      bindings.stairway++;
+      const s = placed.get(stairId);
+      if (s && (!s.scene || s.scene === scene.id)) bindings.stairwaySameScene++;
+      count(raw);
+      any = true;
+    }
+    if (any) bindings.scenesWithAny++;
+  }
+
+  return {
+    role: { isGM: !!game.user?.isGM, responsibleGM: isResponsibleGM() },
+    patches: { canvasDraw: canvasDrawPatched, sceneActivate: activatePatched },
+    transitions: { total: defs.length, custom: defs.filter(d => transitionKey(d.id) === "custom").length, byGroup },
+    integrations: { stairways: stairwaysActive(), ...stairwaysDebugState(), stairwaysPlaced },
+    bindings: { ...bindings, byTransition },
+    canvas: { ready: !!canvas?.ready, hasScene: !!canvas?.scene, viewingActiveScene: !!canvas?.scene?.active },
+    textures: textureStats(),
+    activate: activateDebugState(),
+    ...playerDebugState(),
+    issues: issueSummary()
+  };
+}
+
+registerDebugRecorder(debugSnapshot);
 
 Hooks.once("init", () => {
   game.settings.registerMenu(MODULE_ID, "manager", {
@@ -69,7 +134,10 @@ Hooks.once("init", () => {
   });
 
   patchCanvasDraw();
+  canvasDrawPatched = true;
   originalActivate = patchActivate();
+  activatePatched = true;
+  registerDebugRecorder(debugSnapshot);
 });
 
 Hooks.once("setup", () => {
@@ -135,4 +203,5 @@ Hooks.once("ready", () => {
   if (game.user.isGM && !game.settings.get(MODULE_ID, "enabled")) {
     console.log(`${MODULE_ID} | ${t("DisabledHere")}`);
   }
+  registerDebugRecorder(debugSnapshot);
 });
