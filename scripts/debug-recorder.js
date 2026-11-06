@@ -27,6 +27,7 @@ let registered = false;
 const issues = {};
 let lastIssue = null;
 
+/** The recorder's API, or null when it isn't installed (or reading it fails). */
 function recorder() {
   try {
     return recorderApi ?? globalThis.game?.modules?.get?.(RECORDER_ID)?.api ?? null;
@@ -35,6 +36,7 @@ function recorder() {
   }
 }
 
+/** The snapshot handed to the recorder: never throws, returns {snapshotFailed: true} when building it fails. */
 function safeSnapshot() {
   try {
     return snapshotFn ? snapshotFn() : {};
@@ -44,11 +46,12 @@ function safeSnapshot() {
   }
 }
 
+/** Registers with the recorder when both it and the snapshot are there, once. */
 function tryRegister() {
   if (registered || !snapshotFn) return;
-  const rec = recorder();
-  if (typeof rec?.register !== "function") return;
   try {
+    const rec = recorder();
+    if (typeof rec?.register !== "function") return;
     rec.register(MODULE_ID, { snapshot: safeSnapshot });
     registered = true;
   } catch (err) {
@@ -89,8 +92,12 @@ const ERROR_NAMES = new Set(["Error", "TypeError", "RangeError", "ReferenceError
   "InvalidStateError", "SecurityError", "QuotaExceededError"]);
 /** An error's class name when it is a standard one, else "Error" (never the message, which can hold names). */
 export function errorName(err) {
-  const name = err?.name;
-  return typeof name === "string" && ERROR_NAMES.has(name) ? name : "Error";
+  try {
+    const name = err?.name;
+    return typeof name === "string" && ERROR_NAMES.has(name) ? name : "Error";
+  } catch {
+    return "Error";
+  }
 }
 
 const SOURCES = new Set(["explicit", "pair", "enter", "default", "stairway"]);
