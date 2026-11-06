@@ -1,6 +1,6 @@
 import { MODULE_ID, sceneName, nextFrame, sleep } from "./util.js";
 import { TRANSITIONS, knownIds } from "./transitions.js";
-import { resolveBinding, phaseDurations, ease, NONE } from "./bindings.js";
+import { resolveBinding, phaseDurations, ease, NONE, TITLE_WHEN } from "./bindings.js";
 import { crumb, noteIssue, transitionKey, sourceKey, errorName } from "./debug-recorder.js";
 
 /**
@@ -24,6 +24,8 @@ const MAX_PIXELS = 3840 * 2160;
 let pending = null;
 /** The transition that is playing now. */
 let current = null;
+/** Why a run was cancelled, as recorded for the debug recorder; any other reason is recorded as "cancelled". */
+const CANCEL_REASONS = new Set(["cancelled", "superseded", "canvasCleared", "watchdog", "contextLost", "error", "startFailed"]);
 /** Run counts for the debug recorder's snapshot. */
 const stats = { started: 0, finished: 0, cancelled: 0, skipped: 0, byKind: {}, cancelReasons: {} };
 
@@ -217,9 +219,9 @@ class Run {
       stairway: !!this.context?.stairway,
       split: !!this.def.split,
       hold: !!this.def.hold,
-      durationMs: this.binding.duration,
+      durationMs: Number.isFinite(this.binding.duration) ? this.binding.duration : null,
       title: !!this.title,
-      titleWhen: this.titleWhen,
+      titleWhen: TITLE_WHEN.includes(this.titleWhen) ? this.titleWhen : null,
       sound: !!this.binding.sound,
       aheadOfChange: !!this.claimFor,
       snapshotA: this.hadA
@@ -305,7 +307,7 @@ class Run {
 
   /** Stops the run and removes the overlay. reason (for the debug recorder): one of this module's fixed reasons. */
   cancel(reason = "cancelled") {
-    if (!this.removed && !this.outcome) this.cancelReason ??= reason;
+    if (!this.removed && !this.outcome) this.cancelReason ??= CANCEL_REASONS.has(reason) ? reason : "cancelled";
     this.cancelled = true;
     for (const timer of this.titleTimers ?? []) clearTimeout(timer);
     clearTimeout(this.timer);
