@@ -3,6 +3,7 @@ import { knownIds } from "./transitions.js";
 import { sanitizeBinding, NONE } from "./bindings.js";
 import { pickerHTML, readPicker, wirePickers, playThumb } from "./picker.js";
 import { bindingFor, setPending } from "./player.js";
+import { crumb, noteIssue, transitionKey, errorName } from "./debug-recorder.js";
 
 /**
  * Activating a scene with a transition. The GM's choice is put into the scene update's options, so every client
@@ -65,15 +66,29 @@ export async function activationDialog(scene) {
       { action: "cancel", label: t("Dialog.Cancel"), icon: "fa-solid fa-xmark", callback: () => null }
     ]
   });
-  if (!result || typeof result !== "object") return null;
+  if (!result || typeof result !== "object") {
+    crumb("activate.dialog", { result: "cancel" });
+    return null;
+  }
+  crumb("activate.dialog", {
+    result: result.binding?.transition === NONE ? "plain" : "activate",
+    transition: transitionKey(result.binding?.transition),
+    bindPair: !!(result.bind && from)
+  });
   if (result.bind && from) {
     try {
       await scene.update({ [`flags.${MODULE_ID}.from.${from.id}`]: result.binding });
     } catch (err) {
       console.error(`${MODULE_ID} | could not save the binding`, err);
+      noteIssue("activate", "bindFailed", { error: errorName(err) });
     }
   }
   return { binding: result.binding };
+}
+
+/** Activation state for the debug recorder's snapshot. */
+export function activateDebugState() {
+  return { outgoing: outgoing.size };
 }
 
 /** Activates a scene with a payload, without the dialog. */
@@ -113,6 +128,7 @@ export function onPreUpdateScene(scene, changed, options) {
   if (changed?.active !== true || !outgoing.has(scene.id)) return;
   const payload = outgoing.get(scene.id);
   options[MODULE_ID] = { binding: payload?.binding ? sanitizeBinding(payload.binding, knownIds()) : null };
+  crumb("activate.send", { explicit: !!options[MODULE_ID].binding, transition: transitionKey(options[MODULE_ID].binding?.transition ?? null) });
 }
 
 /** updateScene (every client): remember the transition chosen for this activation. */
@@ -122,4 +138,5 @@ export function onUpdateScene(scene, changed, options) {
   if (!payload || typeof payload !== "object") return;
   const binding = payload.binding ? sanitizeBinding(payload.binding, knownIds()) : null;
   setPending(scene.id, { binding });
+  crumb("activate.receive", { explicit: !!binding, transition: transitionKey(binding?.transition ?? null), viewedScene: scene.id === canvas?.scene?.id });
 }

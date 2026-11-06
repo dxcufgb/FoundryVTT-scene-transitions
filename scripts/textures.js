@@ -15,6 +15,7 @@ export const TEXTURES = [
 const images = new Map();
 const tinted = new Map();
 let loading = null;
+let failed = 0;
 
 /** Starts loading the textures (once). Resolves when all have loaded or failed. */
 export function loadTextures() {
@@ -22,10 +23,15 @@ export function loadTextures() {
   loading = Promise.all(TEXTURES.map(name => new Promise(resolve => {
     const img = new Image();
     img.onload = () => { images.set(name, img); resolve(); };
-    img.onerror = () => { console.warn(`dxcufgbs-scene-transitions | texture ${name} failed to load`); resolve(); };
+    img.onerror = () => { failed++; console.warn(`dxcufgbs-scene-transitions | texture ${name} failed to load`); resolve(); };
     img.src = new URL(`${name}.webp`, BASE).href;
   })));
   return loading;
+}
+
+/** Texture state for the debug recorder's snapshot (counts only). */
+export function textureStats() {
+  return { total: TEXTURES.length, loaded: images.size, failed, tinted: tinted.size, loading: !!loading && images.size + failed < TEXTURES.length };
 }
 
 /** True when every named texture is ready. */

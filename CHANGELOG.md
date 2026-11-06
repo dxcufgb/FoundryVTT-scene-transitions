@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Optional support for Dxcufgb's Debug Recorder: while it records, this module adds what helps with bug reports (how many bindings of each kind there are, whether Stairways was found, the transition playing or waiting, run counts and the fallbacks taken, such as an empty snapshot or a timeout) and a trail of its main steps. No scene, stairway or user names, title texts or sound paths are recorded. Without the recorder nothing changes.
+
 ## 0.1.2
 
 - Fix: a transition could leave the screen covered (reported as a white screen). The overlay now always goes away: it is removed if the game canvas loses its WebGL context, if starting the transition fails, and in any case once the transition has run longer than it possibly could.

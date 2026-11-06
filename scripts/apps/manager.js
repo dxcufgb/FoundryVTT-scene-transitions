@@ -2,6 +2,7 @@ import { MODULE_ID, TEMPLATE_PATH, t, sceneName, stairwaysActive } from "../util
 import { knownIds } from "../transitions.js";
 import { sanitizeBinding } from "../bindings.js";
 import { pickerHTML, wirePickers } from "../picker.js";
+import { crumb, noteIssue, transitionKey, errorName } from "../debug-recorder.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -111,6 +112,12 @@ export class TransitionManager extends HandlebarsApplicationMixin(ApplicationV2)
 
   _onRender(context, options) {
     super._onRender?.(context, options);
+    crumb("manager.render", {
+      first: !!options?.isFirstRender,
+      hasScene: !!context?.scene,
+      fromRows: context?.fromRows?.length ?? 0,
+      stairways: context?.stairways?.length ?? 0
+    });
     const root = this.element;
     root.querySelector('[data-dxst="scene"]')?.addEventListener("change", event => {
       this.sceneId = event.target.value;
@@ -136,6 +143,8 @@ export class TransitionManager extends HandlebarsApplicationMixin(ApplicationV2)
 
   async #save(key, raw) {
     const binding = sanitizeBinding(raw, knownIds());
+    const area = ["default", "same", "enter", "from", "stair"].find(a => key === a || key.startsWith(`${a}.`)) ?? "other";
+    crumb("manager.save", { area, transition: transitionKey(binding.transition) });
     try {
       if (key === "default") return await game.settings.set(MODULE_ID, "defaultBinding", binding);
       if (key === "same") return await game.settings.set(MODULE_ID, "sameSceneBinding", binding);
@@ -148,6 +157,7 @@ export class TransitionManager extends HandlebarsApplicationMixin(ApplicationV2)
       await scene.update({ [`flags.${MODULE_ID}.${path}.${m[2]}`]: binding });
     } catch (err) {
       console.error(`${MODULE_ID} | save failed`, err);
+      noteIssue("manager", "saveFailed", { area, error: errorName(err) });
       ui.notifications.error(t("SaveFailed"));
     }
   }

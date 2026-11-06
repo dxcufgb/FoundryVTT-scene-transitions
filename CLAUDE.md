@@ -49,6 +49,11 @@ System-agnostic. No build step and no npm dependencies. Stairways is optional.
   film badge (`stairwayPartner` finds the other end: same name on the target scene).
 - `scripts/apps/manager.js` + `templates/manager.hbs` – the Transitions manager (ApplicationV2): world defaults,
   a scene's "entering" binding, its "coming from" rows and its stairways.
+- `scripts/debug-recorder.js` – optional integration with Dxcufgb's Debug Recorder (`dxcufgbs-debug-recorder`, not a
+  dependency): `registerDebugRecorder(snapshot)` (once, on the recorder's ready hook or this module's init/ready),
+  `crumb(key, data)` (only while recording, never throws), `noteIssue(area, reason, data)` (counts a fallback, crumb
+  `<area>.fallback`), and `transitionKey` / `sourceKey` / `errorName`, which keep recorded values to this module's own
+  fixed ids (other modules' transitions become `"custom"`). The snapshot is `debugSnapshot()` in `main.js`.
 - `styles/scene-transitions.css`, `lang/en.json`.
 
 ## Data
@@ -65,6 +70,9 @@ System-agnostic. No build step and no npm dependencies. Stairways is optional.
   (`dxcufgbsPreSceneTransition`, `dxcufgbsSceneTransitionStart`, `dxcufgbsSceneTransitionEnd`), the built-in
   transition ids.
 - The PreStairwayTeleport handler must never return false.
+- The debug-recorder integration is optional: the module works the same without the recorder, and nothing in it may
+  throw into the module. Snapshot and breadcrumb data must never contain names, free text, image paths or URLs (no
+  scene or stairway names, title texts, sound paths); only counts, booleans, numbers and this module's own ids.
 
 ## Tests
 `node --test tests/*.test.mjs` (also run by CI through `.github/foundry-module.json`).

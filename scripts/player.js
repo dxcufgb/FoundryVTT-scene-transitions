@@ -1,6 +1,7 @@
 import { MODULE_ID, sceneName, nextFrame, sleep } from "./util.js";
 import { TRANSITIONS, knownIds } from "./transitions.js";
-import { resolveBinding, phaseDurations, ease, NONE } from "./bindings.js";
+import { resolveBinding, phaseDurations, ease, NONE, TITLE_WHEN } from "./bindings.js";
+import { crumb, noteIssue, transitionKey, sourceKey, errorName } from "./debug-recorder.js";
 
 /**
  * The transition player. When the canvas is about to draw another scene, it snapshots the old one onto an overlay
@@ -23,6 +24,10 @@ const MAX_PIXELS = 3840 * 2160;
 let pending = null;
 /** The transition that is playing now. */
 let current = null;
+/** Why a run was cancelled, as recorded for the debug recorder; any other reason is recorded as "cancelled". */
+const CANCEL_REASONS = new Set(["cancelled", "superseded", "canvasCleared", "watchdog", "contextLost", "error", "startFailed"]);
+/** Run counts for the debug recorder's snapshot. */
+const stats = { started: 0, finished: 0, cancelled: 0, skipped: 0, byKind: {}, cancelReasons: {} };
 
 export function setPending(sceneId, { binding = null, snapshot = null } = {}) {
   pending = { sceneId, binding, snapshot, ts: Date.now() };
@@ -82,11 +87,13 @@ export function snapshotCanvas() {
     x.drawImage(view, 0, 0, w, h);
     if (isEmpty(c)) {
       console.warn(`${MODULE_ID} | snapshot came out empty (the browser did not hand back the WebGL picture)`);
+      noteIssue("run", "snapshotEmpty", { w, h });
       return null;
     }
     return c;
   } catch (err) {
     console.warn(`${MODULE_ID} | snapshot failed`, err);
+    noteIssue("run", "snapshotFailed", { error: errorName(err) });
     return null;
   }
 }
@@ -146,6 +153,7 @@ class Run {
     const size = overlaySize(view?.width || window.innerWidth, view?.height || window.innerHeight);
     this.w = A?.width || size.w;
     this.h = A?.height || size.h;
+    this.hadA = !!A;
     this.A = A ?? blank(this.w, this.h);
     this.durations = phaseDurations(binding.duration, def.split);
   }
@@ -179,21 +187,45 @@ class Run {
       : Promise.resolve();
 
     const timeout = this.kind === "local" ? LOCAL_TIMEOUT : SCENE_TIMEOUT;
-    this.timer = setTimeout(() => this.arrive(), timeout);
+    this.timer = setTimeout(() => {
+      if (!this.arrived && !this.cancelled) noteIssue("run", "timeout", { kind: this.kind, ms: timeout });
+      this.arrive();
+    }, timeout);
     // Started ahead of a scene change (a stairway): if the change doesn't come, play back into the current view
-    if (this.claimFor) this.claimTimer = setTimeout(() => this.arrive(), CLAIM_TIMEOUT);
+    if (this.claimFor) this.claimTimer = setTimeout(() => {
+      if (!this.arrived && !this.cancelled) noteIssue("run", "claimTimeout", { ms: CLAIM_TIMEOUT });
+      this.arrive();
+    }, CLAIM_TIMEOUT);
     // Whatever goes wrong, the overlay never stays up past the longest a run can take
     const longest = timeout + CLAIM_TIMEOUT + this.durations.out + this.durations.in + TITLE_HOLD + TITLE_FADE;
     this.watchdog = setTimeout(() => {
       console.warn(`${MODULE_ID} | the transition did not finish in time, removing it`);
-      this.cancel();
+      noteIssue("run", "watchdog", { kind: this.kind, transition: transitionKey(this.def.id) });
+      this.cancel("watchdog");
     }, longest + WATCHDOG_SLACK);
     // The game canvas lost its WebGL context (GPU reset or out of memory): get out of the way
     this.onContextLost = () => {
       console.warn(`${MODULE_ID} | the canvas lost its WebGL context, stopping the transition`);
-      this.cancel();
+      noteIssue("run", "contextLost", { kind: this.kind });
+      this.cancel("contextLost");
     };
     canvas.app?.view?.addEventListener?.("webglcontextlost", this.onContextLost);
+    stats.started++;
+    stats.byKind[this.kind] = (stats.byKind[this.kind] ?? 0) + 1;
+    crumb("run.start", {
+      kind: this.kind,
+      transition: transitionKey(this.def.id),
+      source: sourceKey(this.context?.source),
+      stairway: !!this.context?.stairway,
+      split: !!this.def.split,
+      hold: !!this.def.hold,
+      durationMs: Number.isFinite(this.binding.duration) ? this.binding.duration : null,
+      title: !!this.title,
+      titleWhen: TITLE_WHEN.includes(this.titleWhen) ? this.titleWhen : null,
+      sound: !!this.binding.sound,
+      aheadOfChange: !!this.claimFor,
+      snapshotA: this.hadA
+    });
     if (this.kind === "preview") this.arrive();
   }
 
@@ -232,8 +264,9 @@ class Run {
     clearTimeout(this.claimTimer);
     this.finish(prepare).catch(err => {
       console.error(`${MODULE_ID} | transition failed`, err);
+      noteIssue("run", "failed", { kind: this.kind, transition: transitionKey(this.def.id), error: errorName(err) });
       // cancel(), not just remove(): it also stops the hold loop and the title timers
-      this.cancel();
+      this.cancel("error");
     });
   }
 
@@ -246,10 +279,12 @@ class Run {
     await nextFrame();
     if (this.cancelled) return;
     this.B = (this.kind === "preview" ? (this.previewB ?? this.A) : snapshotCanvas()) ?? blank(this.w, this.h);
+    crumb("run.in", { kind: this.kind, transition: transitionKey(this.def.id), waitedMs: Math.round(performance.now() - this.t0) });
     this.inStarted = true;
     if (this.titleWhen === "during" && !this.def.split) this.scheduleTitle(this.durations.in * 0.3);
     await animate(this.durations.in, raw => this.frame("in", raw), () => this.cancelled);
     if (this.cancelled) return;
+    this.outcome = "finished";
     if (this.titleWhen === "after") this.scheduleTitle(0);
     // A title card still on screen stays over the live scene until it has faded
     const left = this.titleWhen === "after" ? TITLE_HOLD : (this.titleUntil ?? 0) - performance.now();
@@ -270,7 +305,9 @@ class Run {
     ];
   }
 
-  cancel() {
+  /** Stops the run and removes the overlay. reason (for the debug recorder): one of this module's fixed reasons. */
+  cancel(reason = "cancelled") {
+    if (!this.removed && !this.outcome) this.cancelReason ??= CANCEL_REASONS.has(reason) ? reason : "cancelled";
     this.cancelled = true;
     for (const timer of this.titleTimers ?? []) clearTimeout(timer);
     clearTimeout(this.timer);
@@ -289,6 +326,20 @@ class Run {
     this.el?.remove();
     for (const c of [this.cv, this.A, this.B, this.previewB, ...Object.values(this.state)]) release(c);
     if (current === this) current = null;
+    const outcome = this.outcome ?? "cancelled";
+    if (outcome === "finished") stats.finished++;
+    else {
+      stats.cancelled++;
+      const reason = this.cancelReason ?? "cancelled";
+      stats.cancelReasons[reason] = (stats.cancelReasons[reason] ?? 0) + 1;
+    }
+    crumb("run.end", {
+      kind: this.kind,
+      transition: transitionKey(this.def.id),
+      outcome,
+      reason: outcome === "finished" ? null : (this.cancelReason ?? "cancelled"),
+      ms: Math.round(performance.now() - (this.t0 ?? performance.now()))
+    });
     Hooks.callAll("dxcufgbsSceneTransitionEnd", this.context);
   }
 }
@@ -301,22 +352,28 @@ class Run {
  */
 export function startRun(binding, { A = null, kind = "scene", title = "", context = {}, claimFor = null, previewB = null } = {}) {
   if (!binding || binding.transition === NONE) return null;
+  const skip = reason => {
+    stats.skipped++;
+    crumb("run.skip", { kind, reason, transition: transitionKey(binding?.transition) });
+    return null;
+  };
   // A hidden tab gets no animation frames, so the overlay would hang there until the user comes back
-  if (document.hidden) return null;
+  if (document.hidden) return skip("hiddenTab");
   const def = TRANSITIONS.get(binding.transition);
-  if (!def) return null;
+  if (!def) return skip("unknownTransition");
   const ctx = { ...context, binding, kind };
-  if (Hooks.call("dxcufgbsPreSceneTransition", ctx) === false) return null;
+  if (Hooks.call("dxcufgbsPreSceneTransition", ctx) === false) return skip("hookCancelled");
   const finalDef = TRANSITIONS.get(ctx.binding?.transition) ?? def;
-  if (ctx.binding?.transition === NONE) return null;
-  current?.cancel();
+  if (ctx.binding?.transition === NONE) return skip("hookNone");
+  current?.cancel("superseded");
   const run = new Run(finalDef, ctx.binding ?? binding, A ?? snapshotCanvas(), { kind, title, context: ctx, claimFor, previewB });
   current = run;
   try {
     run.start();
   } catch (err) {
     console.error(`${MODULE_ID} | could not start the transition`, err);
-    run.cancel();
+    noteIssue("run", "startFailed", { kind, transition: transitionKey(finalDef.id), error: errorName(err) });
+    run.cancel("startFailed");
     return null;
   }
   return run;
@@ -324,6 +381,36 @@ export function startRun(binding, { A = null, kind = "scene", title = "", contex
 
 export function currentRun() {
   return current;
+}
+
+/** Player state for the debug recorder's snapshot: counts, booleans and fixed ids only. */
+export function playerDebugState() {
+  const run = current;
+  const pend = pending && Date.now() - pending.ts <= PENDING_TTL ? pending : null;
+  return {
+    runs: { ...stats, byKind: { ...stats.byKind }, cancelReasons: { ...stats.cancelReasons } },
+    current: run ? {
+      kind: run.kind,
+      transition: transitionKey(run.def?.id),
+      split: !!run.def?.split,
+      hold: !!run.def?.hold,
+      arrived: !!run.arrived,
+      inStarted: !!run.inStarted,
+      claimed: !!run.claimed,
+      waitingForClaim: !!run.claimFor,
+      cancelled: !!run.cancelled,
+      textured: typeof run.state?.textured === "boolean" ? run.state.textured : null,
+      ageMs: run.t0 ? Math.round(performance.now() - run.t0) : 0
+    } : null,
+    overlayInDom: !!document.getElementById("dxst-overlay"),
+    pending: pend ? {
+      explicit: !!pend.binding,
+      transition: pend.binding ? transitionKey(pend.binding.transition) : null,
+      hasSnapshot: !!pend.snapshot,
+      ageMs: Date.now() - pend.ts,
+      forViewedScene: pend.sceneId === canvas?.scene?.id
+    } : null
+  };
 }
 
 /** The binding a scene change from → to uses on this client, with an optional explicit one. */
@@ -347,7 +434,8 @@ function beforeDraw(cnv, scene) {
   const from = cnv.scene;
   // draw(null) clears the canvas: there is no scene to go to, and a transition still playing has nothing to land on
   if (scene === null) {
-    current?.cancel();
+    if (current) crumb("canvas.draw", { decision: "cleared" });
+    current?.cancel("canvasCleared");
     return;
   }
   const to = scene ?? game.scenes.current;
@@ -356,13 +444,27 @@ function beforeDraw(cnv, scene) {
   if (current && !current.arrived && !current.cancelled && current.claimFor === to.id) {
     current.claim();
     takePending(to.id);
+    crumb("canvas.draw", { decision: "claimed" });
     return;
   }
   const p = takePending(to.id);
-  if (!clientEnabled()) return;
+  if (!clientEnabled()) {
+    crumb("canvas.draw", { decision: "disabled", pending: !!p });
+    return;
+  }
   // A GM just looking at another scene gets no transition, unless they asked for it or chose one
-  if (!p && game.user.isGM && !game.settings.get(MODULE_ID, "gmView")) return;
+  if (!p && game.user.isGM && !game.settings.get(MODULE_ID, "gmView")) {
+    crumb("canvas.draw", { decision: "gmView" });
+    return;
+  }
   const { binding, source } = bindingFor(from, to, p?.binding ?? null);
+  crumb("canvas.draw", {
+    decision: binding.transition === NONE ? "none" : "start",
+    pending: !!p,
+    explicit: !!p?.binding,
+    source: sourceKey(source),
+    transition: transitionKey(binding.transition)
+  });
   if (binding.transition === NONE) return;
   startRun(binding, {
     A: p?.snapshot ?? null,

@@ -5,6 +5,7 @@ import { startRun, clientEnabled, bindingFor, titleFor } from "./player.js";
 import { pickerHTML, wirePickers } from "./picker.js";
 import { stairwayTarget } from "./apps/manager.js";
 import { StairwayTransitionEditor, describeStairwayBinding } from "./apps/stair-editor.js";
+import { crumb, noteIssue, transitionKey, sourceKey, errorName } from "./debug-recorder.js";
 
 /**
  * Stairways integration. Each stairway end can have its own binding, kept on its scene in
@@ -28,8 +29,12 @@ function onPreTeleport(data) {
     // Another scene: start right away, before the GM removes the teleported tokens from this scene, so the overlay
     // already covers the view while the tokens move. The canvas wrapper keeps this run when the view changes.
     const target = game.scenes.get(data.targetSceneId);
-    if (!target) return;
+    if (!target) {
+      noteIssue("stairway", "targetMissing", {});
+      return;
+    }
     const { binding, source: from } = bindingFor(source ?? canvas.scene, target, own);
+    crumb("stairway.teleport", { crossScene: true, source: from === "explicit" ? "stairway" : sourceKey(from), transition: transitionKey(binding.transition) });
     if (binding.transition === NONE) return;
     startRun(binding, {
       kind: "scene",
@@ -44,6 +49,7 @@ function onPreTeleport(data) {
     sameSceneDefault: game.settings.get(MODULE_ID, "sameSceneBinding"),
     knownIds: knownIds()
   });
+  crumb("stairway.teleport", { crossScene: false, source: isSet(sanitizeBinding(own, knownIds())) ? "stairway" : "default", transition: transitionKey(binding.transition) });
   if (binding.transition === NONE) return;
   const title = binding.title ? (binding.titleText || data.targetData?.label || "") : "";
   const run = startRun(binding, {
@@ -56,8 +62,9 @@ function onPreTeleport(data) {
 
 function onTeleport(data) {
   if (!data || data.targetSceneId || data.userId !== game.userId || !localRun) return;
-  const { run } = localRun;
+  const { run, ts } = localRun;
   localRun = null;
+  crumb("stairway.arrive", { waitedMs: Date.now() - ts });
   run.arrive(async () => {
     const x = Number(data.targetData?.x), y = Number(data.targetData?.y);
     if (Number.isFinite(x) && Number.isFinite(y)) canvas.pan({ x, y });
@@ -199,14 +206,26 @@ const redrawBadges = foundry.utils.debounce(() => {
   try { drawBadges(); } catch (err) { console.error(`${MODULE_ID} | stairway badges`, err); }
 }, 50);
 
+let stairwaysHooked = false;
+
+/** Stairways state for the debug recorder's snapshot. */
+export function stairwaysDebugState() {
+  return {
+    hooksRegistered: stairwaysHooked,
+    localRunWaiting: !!localRun,
+    badgeCount: badgeLayer && !badgeLayer.destroyed ? badgeLayer.children.length : 0
+  };
+}
+
 export function registerStairways() {
   if (!stairwaysActive()) return;
+  stairwaysHooked = true;
   Hooks.on("PreStairwayTeleport", data => {
-    try { onPreTeleport(data); } catch (err) { console.error(`${MODULE_ID} | stairway`, err); }
+    try { onPreTeleport(data); } catch (err) { console.error(`${MODULE_ID} | stairway`, err); noteIssue("stairway", "error", { hook: "PreStairwayTeleport", error: errorName(err) }); }
     // never return false: that would stop the teleport
   });
   Hooks.on("StairwayTeleport", data => {
-    try { onTeleport(data); } catch (err) { console.error(`${MODULE_ID} | stairway`, err); }
+    try { onTeleport(data); } catch (err) { console.error(`${MODULE_ID} | stairway`, err); noteIssue("stairway", "error", { hook: "StairwayTeleport", error: errorName(err) }); }
   });
   Hooks.on("renderStairwayConfig", (app, html) => {
     try { onRenderStairwayConfig(app, html); } catch (err) { console.error(`${MODULE_ID} | stairway config`, err); }
