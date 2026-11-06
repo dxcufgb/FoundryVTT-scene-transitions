@@ -46,14 +46,16 @@ function safeSnapshot() {
   }
 }
 
-/** Registers with the recorder when both it and the snapshot are there, once. */
+/**
+ * Registers with the recorder when both it and the snapshot are there, once. Only a successful register() (it
+ * returns false on failure) counts, so a later call tries again.
+ */
 function tryRegister() {
   if (registered || !snapshotFn) return;
   try {
     const rec = recorder();
     if (typeof rec?.register !== "function") return;
-    rec.register(MODULE_ID, { snapshot: safeSnapshot });
-    registered = true;
+    if (rec.register(MODULE_ID, { snapshot: safeSnapshot }) !== false) registered = true;
   } catch (err) {
     console.warn(`${MODULE_ID} | could not register with the debug recorder`, err);
   }
