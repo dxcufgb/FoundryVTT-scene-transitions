@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.3
 
 - Optional support for Dxcufgb's Debug Recorder: while it records, this module adds what helps with bug reports (how many bindings of each kind there are, whether Stairways was found, the transition playing or waiting, run counts and the fallbacks taken, such as an empty snapshot or a timeout) and a trail of its main steps. No scene, stairway or user names, title texts or sound paths are recorded. Without the recorder nothing changes.
 
