@@ -75,4 +75,6 @@ System-agnostic. No build step and no npm dependencies. Stairways is optional.
   scene or stairway names, title texts, sound paths); only counts, booleans, numbers and this module's own ids.
 
 ## Tests
-`node --test tests/*.test.mjs` (also run by CI through `.github/foundry-module.json`).
+`node --test tests/*.test.mjs` (also run by CI through `.github/foundry-module.json`). `tests/debug-recorder.test.mjs`
+checks the recorder self-registration in every load order (api already there, ready hook later, recorder absent,
+failing register) with a mocked `Hooks` / `game`.
