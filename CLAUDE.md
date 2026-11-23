@@ -38,7 +38,9 @@ System-agnostic. No build step and no npm dependencies. Stairways is optional.
   it), so there is no socket. Payload `{binding}`; `binding: null` means "each client uses its bound transition".
 - `scripts/picker.js` – the picker used everywhere (escaped HTML string + `wirePickers`), and the thumbnail preview
   (scene thumbs, or a placeholder).
-- `scripts/stairways.js` – Stairways. `PreStairwayTeleport` (never returns false): for a cross-scene teleport it
+- `scripts/stairways.js` – Stairways. `PreStairwayTeleport` (never returns false; registered after `ready` and moved
+  back to the end on each canvasReady, so a teleport another listener vetoes, e.g. Arms Reach's reach check, never starts a
+  transition): for a cross-scene teleport it
   starts a "scene" run right away, `claimFor` the target scene, so the overlay covers the tokens leaving and the
   canvas wrapper keeps the run when the view changes (no change within 5 s → it plays back into the current view);
   for a same-scene one it starts a "local" run that `StairwayTeleport` finishes (pans to the target).

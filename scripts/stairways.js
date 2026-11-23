@@ -207,11 +207,28 @@ const redrawBadges = foundry.utils.debounce(() => {
 }, 50);
 
 let stairwaysHooked = false;
+let preTeleportHookId = null;
+
+function onPreTeleportHook(data) {
+  try { onPreTeleport(data); } catch (err) { console.error(`${MODULE_ID} | stairway`, err); noteIssue("stairway", "error", { hook: "PreStairwayTeleport", error: errorName(err) }); }
+  // never return false: that would stop the teleport
+}
+
+/**
+ * (Re)registers the PreStairwayTeleport listener at the end of the list. Hooks.call stops at the first listener that
+ * returns false, so a teleport another module vetoes (Arms Reach: token out of reach) never reaches it and shows no
+ * transition.
+ */
+function hookPreTeleport() {
+  if (preTeleportHookId !== null) Hooks.off("PreStairwayTeleport", preTeleportHookId);
+  preTeleportHookId = Hooks.on("PreStairwayTeleport", onPreTeleportHook);
+}
 
 /** Stairways state for the debug recorder's snapshot. */
 export function stairwaysDebugState() {
   return {
     hooksRegistered: stairwaysHooked,
+    preTeleportHooked: preTeleportHookId !== null,
     localRunWaiting: !!localRun,
     badgeCount: badgeLayer && !badgeLayer.destroyed ? badgeLayer.children.length : 0
   };
@@ -220,10 +237,10 @@ export function stairwaysDebugState() {
 export function registerStairways() {
   if (!stairwaysActive()) return;
   stairwaysHooked = true;
-  Hooks.on("PreStairwayTeleport", data => {
-    try { onPreTeleport(data); } catch (err) { console.error(`${MODULE_ID} | stairway`, err); noteIssue("stairway", "error", { hook: "PreStairwayTeleport", error: errorName(err) }); }
-    // never return false: that would stop the teleport
-  });
+  // The PreStairwayTeleport listener goes after every ready handler (Arms Reach adds its reach check there) and back
+  // to the end on each canvasReady, so it runs only once every other listener has let the teleport through.
+  Hooks.once("ready", () => setTimeout(hookPreTeleport, 0));
+  Hooks.on("canvasReady", () => { if (preTeleportHookId !== null) hookPreTeleport(); });
   Hooks.on("StairwayTeleport", data => {
     try { onTeleport(data); } catch (err) { console.error(`${MODULE_ID} | stairway`, err); noteIssue("stairway", "error", { hook: "StairwayTeleport", error: errorName(err) }); }
   });
