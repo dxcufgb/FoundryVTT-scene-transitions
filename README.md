@@ -21,7 +21,7 @@ In Foundry: **Add-on Modules → Install Module**, paste this link into **Manife
 https://github.com/dxcufgb/FoundryVTT-scene-transitions/releases/latest/download/module.json
 ```
 
-[Stairways](https://foundryvtt.com/packages/stairways) is optional. See [Installation](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/Installation) in the wiki.
+[Stairways](https://foundryvtt.com/packages/stairways) is optional. A stairway teleport that another module refuses (for example [Arms Reach](https://foundryvtt.com/packages/arms-reach) when the token is too far away) shows no transition. See [Installation](https://github.com/dxcufgb/FoundryVTT-scene-transitions/wiki/Installation) in the wiki.
 
 ## Documentation
 
